@@ -1,0 +1,24 @@
+ 1075  java -jar sei.jar -f config.txt
+ 1076  java -jar sei.jar -f config.txt
+ 1077  java -jar sei.jar -f config.txt
+ 1078  java -jar sei.jar -f config.txt
+ 1079  clear
+ 1080  clear
+ 1081  bash prueba3.sh
+ 1082  clear
+ 1083  bash prueba3.sh
+ 1084  clear
+ 1085  bash prueba3.sh
+ 1086  head -n 1 /etc/passwd | cut -d: -f1-4
+ 1087  cat head -n 1 /etc/passwd | cut -d: -f1-4
+ 1088  clear
+ 1089  clear
+ 1090  ls -la >> comandos_lanzados
+total 32
+drwxr-xr-x  7 pablosetrakianbearzotti  staff  224 Oct  9 09:13 .
+drwxr-xr-x  9 pablosetrakianbearzotti  staff  288 Oct  9 08:12 ..
+-rw-r--r--  1 pablosetrakianbearzotti  staff  597 Oct  9 09:13 clear
+-rw-r--r--  1 pablosetrakianbearzotti  staff  432 Oct  9 09:16 comandos_lanzados
+-rw-r--r--  1 pablosetrakianbearzotti  staff  235 Oct  9 08:47 ej1.sh
+-rw-r--r--  1 pablosetrakianbearzotti  staff  741 Oct  9 09:00 ej2.sh
+-rw-r--r--  1 pablosetrakianbearzotti  staff    0 Oct  9 08:21 hola.txt
