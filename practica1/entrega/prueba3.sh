@@ -51,12 +51,11 @@ declare -A matrix
 # Inicializar la matriz con ceros
 for (( i = 1; i <= num_of_emails; i++ )); do
     matrix[$i,0]=$i
- 	for (( j = 1; j <= num_of_expressions; j++ )); do
+    matrix[$i,1]='x'
+ 	for (( j = 2; j <= num_of_expressions+1; j++ )); do
  		matrix[$i,$j]=0
  	done
 done
-
-# Loop through the emails and count how many times each expression appears in each email
 
 
 # Función para imprimir la matriz actualizada
@@ -89,7 +88,7 @@ while IFS= read -r email_line; do
     # Extract the email text (excluding the number and '|')
     email_text="${email_line#*[0-9]|}"
     
-    j=1;
+    j=2;
     # Read the text with expressions line by line
     while IFS= read -r expression_line; do
       # Count how many times the expression appears in the email text
@@ -109,4 +108,4 @@ while IFS= read -r email_line; do
   fi
 done <<< "$emails"
 
-print_matrix>"matrix.freq"
+print_matrix>"matrix.txt"
