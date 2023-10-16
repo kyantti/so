@@ -1,14 +1,14 @@
 #!/bin/bash
 
 count_occurrences() {
-  local text="$1"
-  local expression="$2"
+  text="$1"
+  expression="$2"
 
   # Use grep with the -o option to match and output each occurrence
   # Then use wc -l to count the lines (i.e., occurrences)
-  local count=$(echo "$text" | grep -o "$expression" | wc -l)
+  count=$(echo $text | grep -o $expression | wc -l)
 
-  echo "$count"
+  return $count
 }
 
 # Example usage:
