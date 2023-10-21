@@ -59,9 +59,8 @@ analyze_emails() {
    fi
 }
 
-
 create_prediction_matrix_from_file() {
-   local input_file="$1"  # Nombre del archivo que contiene la matriz
+   local input_file="$1" # Nombre del archivo que contiene la matriz
    local k=0             # Variable auxiliar para contar el número de filas
 
    # Verificar si el archivo existe
@@ -73,7 +72,7 @@ create_prediction_matrix_from_file() {
    # Leer el archivo línea por línea
    while IFS= read -r line; do
       # Split de la línea en un array utilizando ":" como delimitador
-      IFS=":" read -ra elements <<< "$line"
+      IFS=":" read -ra elements <<<"$line"
 
       email_id="${elements[0]}"
       num_of_terms_in_email="${elements[1]}"
@@ -86,9 +85,10 @@ create_prediction_matrix_from_file() {
       else
          echo "Error. El E-Mail $email_id está vacío, no se tendrá en cuenta en el cálculo del TF-IDF."
       fi
-   done < "$input_file"
+   done <"$input_file"
 
    prediction_matrix_rows="$k"
+   cols=${#elements[@]}
 
    echo "Filas PM: $prediction_matrix_rows"
 
@@ -119,7 +119,6 @@ create_prediction_matrix_from_file() {
       echo "Columna $j: ${column_counts[j]} elementos mayores que 0"
    done
 }
-
 
 create_prediction_matrix_from_anylisis() {
    #Variable auxliar para contar el numero de filas que tendra la nueva matriz prediccion
@@ -173,20 +172,31 @@ create_prediction_matrix_from_anylisis() {
 
 predict_email_intent() {
    for ((i = 0; i < prediction_matrix_rows; i++)); do
+      row_tf_idf_sum=0
       for ((j = 3; j < cols; j++)); do
          occurrences=${prediction_matrix["$i,$j"]}
          total_terms_in_email=${prediction_matrix["$i,1"]}
          total_docs=$rows
          docs_containing_term=${column_counts[j]}
          if [ "$docs_containing_term" -eq 0 ]; then
-             docs_containing_term=1
+            docs_containing_term=1
          fi
          tf=$(echo "scale=2; $occurrences / $total_terms_in_email" | bc)
          idf=$(echo "scale=2; l($total_docs/$docs_containing_term)/l(10)" | bc -l)
          tf_idf=$(echo "$tf * $idf" | bc -l)
+         row_tf_idf_sum=$(echo "scale=2; $row_tf_idf_sum + $tf_idf" | bc)
          prediction_matrix["$i,$j"]="$tf_idf"
       done
+      average_tf_idf=$(echo "scale=2; $row_tf_idf_sum / (cols - 3)" | bc)
+
+      if (($(echo "$average_tf_idf > 0.3" | bc -l))); then
+         prediction_matrix["$i,2"]="1"
+      else
+         prediction_matrix["$i,2"]="0"
+      fi
    done
+
+   echo "$prediction_matrix_rows" "$cols"
 
    echo "TF-IDF Matrix"
 
@@ -196,9 +206,10 @@ predict_email_intent() {
       done
       echo
    done
-  
+
 }
 
-analyze_emails "emails.txt" "sword.txt" "analisis.freq"
+#analyze_emails "emails.txt" "sword.txt" "analisis.freq"
 create_prediction_matrix_from_file "analisis.freq"
 #create_prediction_matrix_from_anylisis
+predict_email_intent

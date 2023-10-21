@@ -70,7 +70,7 @@ while true; do
     echo "3. Informes de resultados"
     echo "4. Ayuda"
     echo "5. Salir"
-    read choice
+    read -r choice
 
     case $choice in
     1)
