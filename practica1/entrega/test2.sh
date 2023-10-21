@@ -1,32 +1,41 @@
 #!/bin/bash
 
-emails_file=emails.txt
-swords_file=sword.txt
-output_file=matrix.txt
-declare -A analysis_matrix
-analysis_matrix_rows=0
-analysis_matrix_cols=0
-analysis_done="false"
-declare -A prediction_matrix
-prediction_matrix_rows=0
-prediction_matrix_cols=0
+# Nombre del archivo que contiene la matriz
+archivo="analysis_matrix.freq"
 
-to_lower() {
-    awk '{print tolower($0)}'
-}
+# Inicializar una matriz vacía
+declare -A matriz
 
-remove_special_chars() {
-    awk '{ gsub(/[^[:alnum:] ]/, " "); gsub(/  +/, " "); print }'
-}
+fila=0
 
-reduce_spaces() {
-    tr -s ' '
-}
+# Leer el archivo línea por línea y dividir en elementos utilizando IFS
+while IFS=":" read -ra elementos; do
+  for ((col = 0; col < ${#elementos[@]}; col++)); do
+    matriz["$fila,$col"]="${elementos[$col]}"
+  done
+  ((fila++))
+done < "$archivo"
 
-clean_text() {
-    input="$1"
-    cleaned_text=$(echo "$input" | to_lower | remove_special_chars | reduce_spaces)
-    echo "$cleaned_text"
+# Imprimir la nueva matriz
+for (( i = 0; i < fila; i++ )); do
+ 	for (( j = 0; j < col; j++ )); do
+ 		echo -n ${matriz[$i,$j]}":"
+ 	done
+ 	echo
+done 
+
+
+calc_docs_cotaining_term(){
+    row_rep_of_term=$1
+    count=0
+
+    for ((i = 0; i < analysis_matrix_rows; i++)); do
+        if [ "${matrix[$i,$row_rep_of_term]}" -gt 0 ]; then
+            ((count++))
+        fi
+    done
+
+    echo "$count"
 }
 
 function calc_total_terms() {
@@ -41,46 +50,19 @@ function calc_total_terms() {
     fi
 }
 
-count_occurrences() {
-    text="$1"          
-    expression="$2"
-    count=$(echo "$text" | grep -o "$expression" | wc -l)
-    echo "$count"
+echo $(calc_total_terms "     ")
+
+function calc_term_freq(){
+    occurrences=$1
+    total_terms=$2
+
+    if [ "$total_terms" -gt 0 ]; then
+        frequency=$(echo "scale=2; $occurrences / $total_terms" | bc)
+        echo "$frequency"
+        return 0
+    else
+        echo "Error: Division por cero. El E-Mail esta vacio."
+        return 1
+    fi
+
 }
-
-analyze_emails(){
-    emails_file=$1
-    swords_file=$2
-    freq_file=$3
-
-    i=0;
-    
-    while IFS="|" read -r email_id email_content; do
-       cleaned_email_content=$(clean_text "$email_content")
-       analysis_matrix[$i,0]=$email_id
-
-       j=1
-       while read -r expression; do
-          cleaned_expression=$(clean_text "$expression")
-          count=$(count_occurrences "$cleaned_email_content" "$cleaned_expression")
-          analysis_matrix[$i,$j]=$count
-          ((j++))
-       done < "$swords_file"
-
-    ((i++))
-    done < "$emails_file"
-
-    analysis_matrix_rows=$i;
-    analysis_matrix_cols=$j
-
-    for (( i = 0; i < analysis_matrix_rows; i++ )); do
-       for (( j = 0; j < analysis_matrix_cols; j++ )); do
-          echo -n ${analysis_matrix[$i,$j]} "" >> "$freq_file"
- 	   done
- 	   echo >> "$freq_file"
-    done
-
-    analysis_done="true"
-}
-
-analyze_emails "emails.txt" "sword.txt" "analysis_matrix.freq"

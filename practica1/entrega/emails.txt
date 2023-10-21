@@ -1,5 +1,7 @@
 1|Hola soy un principe nigeriano que te hara una oferta que no podras rechazar.
 2|This offer is 4u my friend come and buy new car we accept credit cards.
 3|Este es un email normal.
-4|Atencion, realice el pago con tarjeta o su cuenta de instagram se bloqueara.
-5|Se compra dolar a 300 pesos, efectivo o pago con tarjeta.
+4|
+5|Atencion, realice el pago con tarjeta o su cuenta de instagram se bloqueara.
+6|Se compra dolar a 300 pesos, efectivo o pago con tarjeta.
+7| 34094093

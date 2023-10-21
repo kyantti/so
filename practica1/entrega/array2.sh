@@ -133,11 +133,48 @@ is_spam() {
     fi
 }
 
+
+function calc_term_freq() {
+   occurrences=$1
+   total_terms=$2
+
+   if [ "$total_terms" -gt 0 ]; then
+      frequency=$(echo "scale=2; $occurrences / $total_terms" | bc)
+      echo "$frequency"
+      return 0
+   else
+      echo "Error: Division por cero. El E-Mail esta vacio."
+      return 1
+   fi
+
+}
+
+function calc_inv_doc_frequency() {
+   total_docs=$1
+   docs_containing_term=$2
+
+   if [ "$docs_containing_term" -eq 0 ]; then
+      echo "Error: Division por cero. El termino no se encuentra en ningun E-Mail."
+      return 1
+   else
+      idf=$(echo "scale=2; l($total_docs/$docs_containing_term)/l(10)" | bc -l)
+      echo "$idf"
+      return 0
+   fi
+}
+
+calc_tfidf() {
+   term_freq=$1
+   inv_doc_freq=$2
+   tfidf=$(echo "$term_freq * $inv_doc_freq" | bc -l)
+   echo "$tfidf"
+}
+
 # Call the analyze_emails function with your input files
-analyze_emails "$emails_file" "$swords_file" "$output_file"
+#analyze_emails "$emails_file" "$swords_file" "$output_file"
 
 # Llama a la función con el término deseado
-calc_docs_containing_term "4u"
+#calc_docs_containing_term "4u"
 
 # Llama a la función con los valores de ejemplo
 calc_inv_doc_frequency 10000 100

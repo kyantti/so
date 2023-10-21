@@ -18,7 +18,7 @@ remove_special_chars() {
 # Función para realizar el análisis de datos
 verify_input() {
     echo "Introduce el nombre del fichero que contiene las palabras fraudulentas (.txt):"
-    read words_file
+    read -r words_file
 
     # Verificar la existencia de los ficheros
     if [ ! -f "$words_file" ]; then
@@ -27,7 +27,7 @@ verify_input() {
     fi
 
     echo "Introduce el nombre del fichero que contiene los correos electrónicos (.txt):"
-    read emails_file
+    read -r emails_file
 
     # Verificar la existencia de los ficheros
     if [ ! -f "$emails_file" ]; then
@@ -36,7 +36,7 @@ verify_input() {
     fi
 
     echo "Introduce el nombre del fichero para guardar el resultado del análisis (.freq):"
-    read result_file
+    read -r result_file
 
 
     # Verificar si el archivo de resultado ya existe
