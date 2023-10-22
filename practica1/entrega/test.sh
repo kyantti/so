@@ -18,45 +18,175 @@ clean_text() {
 }
 
 analyze_emails() {
+   while true; do
+      # Prompt for the first file
+      read -rp "Enter the name of the first file: " emails_file
 
-   if [ $# -ne 3 ]; then
-      echo "El método analyze_emails debe llamarse con 3 argumentos."
-   else
-      emails_file=$1
-      swords_file=$2
-      freq_file=$3
-      i=0
+      # Check if the first file exists
+      if [ ! -f "$emails_file" ]; then
+         read -rp "The first file does not exist. Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      elif [ ! -s "$emails_file" ]; then
+         read -rp "The first file is empty. Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      else
+         # Check if the first file follows the specified structure
+         if grep -qvE '^[0-9]+\|.+$' "$emails_file"; then
+            echo "The content of the first file does not follow the required structure (ID| Document content)."
+            read -rp "Do you want to re-enter the file name? (y/n): " reenter
+            case "$reenter" in
+            [Yy]*)
+               continue
+               ;;
+            [Nn]*)
+               exit 1
+               ;;
+            *)
+               echo "Please enter 'y' for yes or 'n' for no."
+               ;;
+            esac
+         fi
+         break
+      fi
+   done
 
-      while IFS="|" read -r email_id email_content; do
-         cleaned_email_content=$(clean_text "$email_content")
-         echo "$cleaned_email_content"
-         analysis_matrix["$i,0"]=$email_id
-         analysis_matrix["$i,1"]=$(echo "$cleaned_email_content" | wc -w | tr -d '[:space:]')
-         analysis_matrix["$i,2"]="x"
-         j=3
-         while read -r expression; do
-            cleaned_expression=$(clean_text "$expression")
-            count=$(echo "$cleaned_email_content" | grep -o "$cleaned_expression" | wc -l | tr -d '[:space:]')
-            analysis_matrix["$i,$j"]=$count
-            ((j++))
-         done <"$swords_file"
-         ((i++))
-      done <"$emails_file"
+   while true; do
+      # Prompt for the second file
+      read -rp "Enter the name of the second file: " expressions_file
 
-      rows=$i
-      cols=$j
+      # Check if the second file exists
+      if [ ! -f "$expressions_file" ]; then
+         read -rp "The second file does not exist. Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      elif [ ! -s "$expressions_file" ]; then
+         read -rp "The second file is empty. Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      elif [ "$expressions_file" = "$emails_file" ]; then
+         echo "The second file cannot be the same as the first file."
+         read -rp "Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      else
+         break
+      fi
+   done
 
-      # Imprimir la nueva matriz
-      for ((i = 0; i < rows; i++)); do
-         for ((j = 0; j < cols; j++)); do
-            echo -n "${analysis_matrix["$i,$j"]}:" >>"$freq_file"
-         done
-         echo >>"$freq_file"
+   # Prompt for the third file
+   while true; do
+      read -rp "Enter the name of the third file (must end with .freq and should not exist): " analysis_file
+
+      if [[ "$analysis_file" != *".freq" ]]; then
+         echo "The third file must end with .freq."
+         read -rp "Do you want to re-enter the file name? (y/n): " reenter
+         case "$reenter" in
+         [Yy]*)
+            continue
+            ;;
+         [Nn]*)
+            exit 1
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      elif [ -e "$analysis_file" ]; then
+         read -rp "The file already exists. Do you want to overwrite it? (y/n): " overwrite
+         case "$overwrite" in
+         [Yy]*)
+            break
+            ;;
+         [Nn]*)
+            continue
+            ;;
+         *)
+            echo "Please enter 'y' for yes or 'n' for no."
+            ;;
+         esac
+      else
+         break
+      fi
+   done
+
+   i=0
+
+   while IFS="|" read -r email_id email_content; do
+      cleaned_email_content=$(clean_text "$email_content")
+      echo "$cleaned_email_content"
+      analysis_matrix["$i,0"]=$email_id
+      analysis_matrix["$i,1"]=$(echo "$cleaned_email_content" | wc -w | tr -d '[:space:]')
+      analysis_matrix["$i,2"]="x"
+      j=3
+      while read -r expression; do
+         cleaned_expression=$(clean_text "$expression")
+         count=$(echo "$cleaned_email_content" | grep -o "$cleaned_expression" | wc -l | tr -d '[:space:]')
+         analysis_matrix["$i,$j"]=$count
+         ((j++))
+      done <"$expressions_file"
+      ((i++))
+   done <"$emails_file"
+
+   rows=$i
+   cols=$j
+
+   # Imprimir la nueva matriz
+   for ((i = 0; i < rows; i++)); do
+      for ((j = 0; j < cols; j++)); do
+         echo -n "${analysis_matrix["$i,$j"]}:" >>"$analysis_file"
       done
+      echo >>"$analysis_file"
+   done
 
-      analysis_done="true"
+   analysis_done="true"
 
-   fi
 }
 
 create_prediction_matrix_from_file() {

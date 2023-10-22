@@ -1,144 +1,97 @@
-#!/bin/bash
+# Function to validate a file's existence
+validate_file() {
+  local file_prompt="$1"
+  local file_variable="$2"
 
-while true; do
-    # Prompt for the first file
-    read -rp "Enter the name of the first file: " file1
+  while true; do
+    read -rp "$file_prompt" "$file_variable"
 
-    # Check if the first file exists
-    if [ ! -f "$file1" ]; then
-        read -rp "The first file does not exist. Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
-    elif [ ! -s "$file1" ]; then
-        read -rp "The first file is empty. Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
+    if [ ! -f "${!file_variable}" ]; then
+      read -rp "The file does not exist. Do you want to re-enter the file name? (y/n): " reenter
+    elif [ ! -s "${!file_variable}" ]; then
+      read -rp "The file is empty. Do you want to re-enter the file name? (y/n): " reenter
     else
-        # Check if the first file follows the specified structure
-        if grep -qvE '^[0-9]+\|.+$' "$file1"; then
-            echo "The content of the first file does not follow the required structure (ID| Document content)."
-            read -rp "Do you want to re-enter the file name? (y/n): " reenter
-            case "$reenter" in
-                [Yy]*)
-                    continue
-                    ;;
-                [Nn]*)
-                    exit 1
-                    ;;
-                *)
-                    echo "Please enter 'y' for yes or 'n' for no."
-                    ;;
-            esac
-        fi
-        break
+      return 0  # File is valid
     fi
-done
 
-while true; do
-    # Prompt for the second file
-    read -rp "Enter the name of the second file: " file2
+    case "$reenter" in
+      [Nn]*) exit 1 ;;
+      *)     echo "Please enter 'y' for yes or 'n' for no." ;;
+    esac
+  done
+}
 
-    # Check if the second file exists
-    if [ ! -f "$file2" ]; then
-        read -rp "The second file does not exist. Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
-    elif [ ! -s "$file2" ]; then
-        read -rp "The second file is empty. Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
-    elif [ "$file2" = "$file1" ]; then
-        echo "The second file cannot be the same as the first file."
-        read -rp "Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
+# Function to validate the third file
+validate_third_file() {
+  local file_prompt="$1"
+  local file_variable="$2"
+
+  while true; do
+    read -rp "$file_prompt" "$file_variable"
+
+    if [[ "${!file_variable}" != *".freq" ]]; then
+      echo "The file must end with .freq."
+      read -rp "Do you want to re-enter the file name? (y/n): " reenter
+    elif [ -e "${!file_variable}" ]; then
+      read -rp "The file already exists. Do you want to overwrite it? (y/n): " overwrite
+      case "$overwrite" in
+        [Yy]*) break ;;
+        [Nn]*) continue ;;
+        *)     echo "Please enter 'y' for yes or 'n' for no." ;;
+      esac
     else
-        break
+      return 0  # File is valid
     fi
-done
 
-# Prompt for the third file
-while true; do
-    read -rp "Enter the name of the third file (must end with .freq and should not exist): " file3
+    case "$reenter" in
+      [Nn]*) exit 1 ;;
+      *)     echo "Please enter 'y' for yes or 'n' for no." ;;
+    esac
+  done
+}
 
-    if [[ "$file3" != *".freq" ]]; then
-        echo "The third file must end with .freq."
-        read -rp "Do you want to re-enter the file name? (y/n): " reenter
-        case "$reenter" in
-            [Yy]*)
-                continue
-                ;;
-            [Nn]*)
-                exit 1
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
-    elif [ -e "$file3" ]; then
-        read -rp "The file already exists. Do you want to overwrite it? (y/n): " overwrite
-        case "$overwrite" in
-            [Yy]*)
-                break
-                ;;
-            [Nn]*)
-                continue
-                ;;
-            *)
-                echo "Please enter 'y' for yes or 'n' for no."
-                ;;
-        esac
-    else
-        break
-    fi
-done
+# Main script
+analyze_emails() {
+  validate_file "Enter the name of the first file: " "emails_file"
+  validate_file "Enter the name of the second file: " "expressions_file"
 
-echo "File names entered:"
-echo "First file: $file1"
-echo "Second file: $file2"
-echo "Third file: $file3"
+  if [ "$emails_file" = "$expressions_file" ]; then
+    echo "The second file cannot be the same as the first file."
+    exit 1
+  fi
+
+  validate_third_file "Enter the name of the third file (must end with .freq and should not exist): " "analysis_file"
+
+  i=0
+  while IFS="|" read -r email_id email_content; do
+    cleaned_email_content=$(clean_text "$email_content")
+    echo "$cleaned_email_content"
+    analysis_matrix["$i,0"]=$email_id
+    analysis_matrix["$i,1"]=$(echo "$cleaned_email_content" | wc -w | tr -d '[:space:]')
+    analysis_matrix["$i,2"]="x"
+    j=3
+    while read -r expression; do
+      cleaned_expression=$(clean_text "$expression")
+      count=$(echo "$cleaned_email_content" | grep -o "$cleaned_expression" | wc -l | tr -d '[:space:]')
+      analysis_matrix["$i,$j"]=$count
+      ((j++))
+    done <"$expressions_file"
+    ((i++))
+  done <"$emails_file
+
+  rows=$i
+  cols=$j
+
+  # Print the new matrix to the analysis file
+  for ((i = 0; i < rows; i++)); do
+    for ((j = 0; j < cols; j++)); do
+      echo -n ${analysis_matrix["$i,$j"]}:" >> "$analysis_file"
+    done
+    echo >> "$analysis_file"
+  done
+
+  analysis_done="true"
+}
+
+# Run the main script
+analyze_emails
