@@ -7,6 +7,7 @@ rows=0
 cols=0
 analysis_done="false"
 
+
 clean_text() {
     input="$1"
     cleaned_text=$(echo "$input" | awk '{print tolower($0)}' | awk '{ gsub(/[^[:alnum:] ]/, " "); gsub(/  +/, " "); gsub(/\<[0-9]+\>/, ""); gsub(/[0-9]+[^[:alnum:]]|[0-9]+$/, ""); print }' | tr -s ' ')
@@ -31,6 +32,9 @@ function progressBar() {
 
 
 function analyze_emails() {
+
+    declare -A term_count
+
     while true; do
         # Prompt for the first file
         read -rp "Enter the name of the first file: " emails_file
@@ -103,36 +107,38 @@ function analyze_emails() {
     
     total_emails=$(wc -l < "$emails_file")
 
-    i=0
     while IFS="|" read -r email_id email_content; do
         cleaned_email_content=$(clean_text "$email_content")
-        analysis_matrix["$i,0"]=$email_id
-        analysis_matrix["$i,1"]=$(echo "$cleaned_email_content" | wc -w | tr -d '[:space:]')
-        analysis_matrix["$i,2"]="x"
-        j=3
+        total_terms=$(echo "$cleaned_email_content" | wc -w | tr -d '[:space:]')
+        analysis_matrix["$email_id,ID"]=$email_id
+        analysis_matrix["$email_id,total_terms"]="$total_terms"
+        analysis_matrix["$email_id,ham_or_spam"]="x"
+        line="$email_id:$total_terms:x"
         progressBar "Analizando E-Mail $email_id" "$i" "$total_emails"
         while read -r expression; do
             cleaned_expression=$(clean_text "$expression")
             count=$(echo "$cleaned_email_content" | grep -o "$cleaned_expression" | wc -l | tr -d '[:space:]')
-            analysis_matrix["$i,$j"]=$count
-            ((j++))
+            analysis_matrix["$email_id,$cleaned_expression"]=$count
+            term_count["$cleaned_expression"]=$((term_count["$cleaned_expression"] + count))
+            line="${line}:${count}"
+
         done <"$words_file"
-        ((i++))
+        
+        echo "$line" >> "$analysis_file"
+
     done <"$emails_file"
 
     progressBar "Análisis completado" "$total_emails" "$total_emails"
     echo
 
-    rows=$i
-    cols=$j
+    # Generar el informe fila/columna
+report_file="term_report.txt"
+echo "Término|Apariciones" > "$report_file"
+for term in "${!term_count[@]}"; do
+    echo "$term|${term_count[$term]}" >> "$report_file"
+done
 
-    # Imprimir la nueva matriz
-    for ((i = 0; i < rows; i++)); do
-        for ((j = 0; j < cols; j++)); do
-            echo -n "${analysis_matrix["$i,$j"]}:" >>"$analysis_file"
-        done
-        echo >>"$analysis_file"
-    done
+echo "Informe generado en $report_file"
     
     analysis_done="true"
 

@@ -1,0 +1,10 @@
+Término|Apariciones
+principe|1
+compra dolar|1
+cash|0
+nigeriano|1
+accept credit cards|1
+4u|1
+deposites|0
+mamapinga|0
+pago con tarjeta|2
