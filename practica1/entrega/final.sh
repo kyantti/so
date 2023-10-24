@@ -340,21 +340,17 @@ while true; do
             read -rp "Seleccione una opción (1-4): " choice
 
             case "${choice}" in
-                1)
-                    echo "item = 1"
+            1) ;;
+            2) ;;
+            3) ;;
+            4)
+                break
                 ;;
-                2)
-                    echo "item = 2 or item = 3"
-                ;;
-                3)
-                ;;
-                4)
-                ;;
-                *)
-                    echo "default (none of above)"
+            *)
+                echo "default (none of above)"
                 ;;
             esac
-            
+
         done
 
         ;;
