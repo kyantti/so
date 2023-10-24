@@ -328,7 +328,35 @@ while true; do
         fi
         ;;
     3)
-        generate_reports
+        while true; do
+            clear
+            echo "Informes:"
+            echo
+            echo "1. Informe en formato fila/columna donde por cada término muestre en cuantos correos electrónicos del conjunto de datos analizado aparece."
+            echo "2. Informe donde para un término particular, solicitado al usuario, se muestren los correos electrónicos donde aparece. Del correo electrónico sólo se mostrarán los 50 primeros caracteres."
+            echo "3. Dado un identificador de correo electrónico, mostrar cuantos términos de los analizados aparecen."
+            echo "4. Regresar al menu principal"
+            echo
+            read -rp "Seleccione una opción (1-4): " choice
+
+            case "${choice}" in
+                1)
+                    echo "item = 1"
+                ;;
+                2)
+                    echo "item = 2 or item = 3"
+                ;;
+                3)
+                ;;
+                4)
+                ;;
+                *)
+                    echo "default (none of above)"
+                ;;
+            esac
+            
+        done
+
         ;;
     4)
         echo "Ayuda"
@@ -337,7 +365,7 @@ while true; do
         echo "Saliendo de la aplicación..."
         exit 0
         ;;
-    
+
     -z)
         continue
         ;;
