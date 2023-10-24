@@ -7,7 +7,6 @@ rows=0
 cols=0
 analysis_done="false"
 
-
 clean_text() {
     input="$1"
     cleaned_text=$(echo "$input" | awk '{print tolower($0)}' | awk '{ gsub(/[^[:alnum:] ]/, " "); gsub(/  +/, " "); gsub(/\<[0-9]+\>/, ""); gsub(/[0-9]+[^[:alnum:]]|[0-9]+$/, ""); print }' | tr -s ' ')
@@ -16,7 +15,7 @@ clean_text() {
 
 # Usage: progressBar "message" currentStep totalSteps
 function progressBar() {
-    local   bar='████████████████████'
+    local bar='████████████████████'
     local space='....................'
     local wheel=('\' '|' '/' '-')
 
@@ -29,7 +28,6 @@ function progressBar() {
 
     echo -ne "\r|${bar:0:$barPosition}$(tput dim)${space:$barPosition:20}$(tput sgr0)| ${wheel[wheelIndex]} ${position}% [ ${msg} ] "
 }
-
 
 function analyze_emails() {
 
@@ -104,8 +102,8 @@ function analyze_emails() {
             break
         fi
     done
-    
-    total_emails=$(wc -l < "$emails_file")
+
+    total_emails=$(wc -l <"$emails_file")
 
     while IFS="|" read -r email_id email_content; do
         cleaned_email_content=$(clean_text "$email_content")
@@ -123,8 +121,8 @@ function analyze_emails() {
             line="${line}:${count}"
 
         done <"$words_file"
-        
-        echo "$line" >> "$analysis_file"
+
+        echo "$line" >>"$analysis_file"
 
     done <"$emails_file"
 
@@ -132,14 +130,14 @@ function analyze_emails() {
     echo
 
     # Generar el informe fila/columna
-report_file="term_report.txt"
-echo "Término|Apariciones" > "$report_file"
-for term in "${!term_count[@]}"; do
-    echo "$term|${term_count[$term]}" >> "$report_file"
-done
+    report_file="term_report.txt"
+    echo "Término|Apariciones" >"$report_file"
+    for term in "${!term_count[@]}"; do
+        echo "$term|${term_count[$term]}" >>"$report_file"
+    done
 
-echo "Informe generado en $report_file"
-    
+    echo "Informe generado en $report_file"
+
     analysis_done="true"
 
 }
@@ -294,7 +292,4 @@ predict_email_intent() {
 
 }
 
-
-
 analyze_emails
-
