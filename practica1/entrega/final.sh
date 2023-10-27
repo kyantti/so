@@ -4,7 +4,7 @@ emails_file=""
 expressions_file=""
 freq_file=""
 tfidf_file=""
-analysis_completed="false"
+analysis_completed=0
 declare -A freq_matrix
 declare -A tfidf_matrix
 declare -a column_counts
@@ -92,10 +92,10 @@ while true; do
 
     case $choice in
     1)
-        return_to_menu="false"
-        file_ok="false"
+        return_to_menu=0
+        file_ok=0
         i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" == "false" ]; do
+        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
             read -rp "Introduzca el nombre del fichero que contiene los correos electrónicos: " emails_file
 
             if [ -z "$emails_file" ]; then
@@ -108,24 +108,24 @@ while true; do
                 ((i--))
                 echo "🚫 El contenido del fichero no sigue la estructura requerida (Identificador|Contenido del correo electrónico). Le quedan $i intentos."
             else
-                file_ok="true"
+                file_ok=1
             fi
             if [ "$i" -eq 0 ]; then
-                return_to_menu="true"
+                return_to_menu=1
                 break
             fi
         done
 
-        if [ "$return_to_menu" == "true" ]; then
+        if [ "$return_to_menu" -eq 1 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
         fi
 
-        return_to_menu="false"
-        file_ok="false"
+        return_to_menu=0
+        file_ok=0
         i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" == "false" ]; do
+        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
             read -rp "Introduzca el nombre del fichero que contiene las expresiones sospechosas: " expressions_file
             if [ -z "$expressions_file" ]; then
                 ((i--))
@@ -137,26 +137,26 @@ while true; do
                 ((i--))
                 echo "🚫 El fichero no puede ser el mismo que el que contiene los correos electrónicos. Le quedan $i intentos."
             else
-                file_ok="true"
+                file_ok=1
             fi
 
             if [ "$i" -eq 0 ]; then
-                return_to_menu="true"
+                return_to_menu=1
                 break
             fi
 
         done
 
-        if [ "$return_to_menu" == "true" ]; then
+        if [ "$return_to_menu" -eq 1 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
         fi
 
-        return_to_menu="false"
-        file_ok="false"
+        return_to_menu=0
+        file_ok=0
         i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" == "false" ]; do
+        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
             read -rp "Introduzca el nombre del fichero donde se escribirá el análisis de los correos electrónicos. (.freq): " freq_file
             if [ -z "$freq_file" ]; then
                 ((i--))
@@ -164,18 +164,21 @@ while true; do
             elif [ -e "$freq_file" ]; then
                 ((i--))
                 echo "🚩 El fichero ya existe. Le quedan $i intentos."
+            elif [[ "$freq_file" != *.freq ]]; then
+                ((i--))
+                echo "🚩 El fichero no tiene extension .freq. Le quedan $i intentos."
             else
-                file_ok="true"
+                file_ok=1
             fi
 
             if [ "$i" -eq 0 ]; then
-                return_to_menu="true"
+                return_to_menu=1
                 break
             fi
 
         done
 
-        if [ "$return_to_menu" == "true" ]; then
+        if [ "$return_to_menu" -eq 1 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
@@ -201,7 +204,7 @@ while true; do
         done <"$emails_file"
         freq_matrix_rows=$i
         cols=$j
-        analysis_completed="true"
+        analysis_completed=1
 
 
         # Imprime la matriz freq en el fichero
@@ -228,37 +231,41 @@ while true; do
         read -rp "Introduzca cualquier tecla para regresar al menú:" key
         ;;
     2)
-        use_current_analysis=""
-        return_to_menu="false"
-        freq_matrix_built="false"
-        if [ "$analysis_completed" == "true" ]; then
-            input_ok="false"
+        use_current_analysis=0
+        return_to_menu=0
+        freq_matrix_built=0
+        input_ok=0
+        load_tfidf=0
+
+        if [ "$analysis_completed" -eq 1 ]; then
             i=3
-            while [ "$i" -gt 0 ] && [ "$input_ok" == "false" ]; do
-                read -rp "Se ha encontrado un análisis en la ejecución. ¿Desea utilizarlo? (s/n):" use_current_analysis
-                if [ "$use_current_analysis" == "s" ]; then
-                    input_ok="true"
+            while [ "$i" -gt 0 ] && [ "$input_ok" -eq 0 ]; do
+                read -rp "Se ha encontrado un análisis en la ejecución. ¿Desea utilizarlo? (s/n):" input
+                if [ "$input" == "s" ]; then
+                    use_current_analysis=1
+                    input_ok=1
                     echo "Usando el análisis encontrado en la ejecución."
-                elif [ "$use_current_analysis" == "n" ]; then
-                    input_ok="true"
+                elif [ "$input" == "n" ]; then
+                    use_current_analysis=0
+                    input_ok=1
                 else
                     ((i--))
                     echo "Respuesta no válida. Le quedan $i intentos."
                 fi
                 if [ "$i" -eq 0 ]; then
-                    return_to_menu="true"
+                    return_to_menu=1
                     break
                 fi
             done
 
-            if [ "$return_to_menu" == "true" ]; then
+            if [ "$return_to_menu" -eq 1 ]; then
                 read -rp "Introduzca cualquier tecla para regresar al menú:" key
                 clear
                 continue
             fi
         fi
 
-        if [ "$use_current_analysis" == "s" ]; then
+        if [ "$use_current_analysis" -eq 1 ]; then
             #Variable auxliar para contar el numero de filas que tendra la nueva matriz prediccion
             k=0
             #Recorre la matriz de analisis y la copia a una nueva matriz para la prediccion
@@ -276,16 +283,15 @@ while true; do
                 fi
             done
             tfidf_matrix_rows="$k"
-            freq_matrix_built="true"
+            freq_matrix_built=1
         fi
 
-        if [ "$analysis_completed" == "false" ] || [ "$use_current_analysis" == "n" ]; then
-            return_to_menu="false"
-            file_ok="false"
-            load_tfidf="false"
+        if [ "$analysis_completed" -eq 0 ] || [ "$use_current_analysis" -eq 0 ]; then
+            return_to_menu=0
+            file_ok=0
             tfidf_file=""
             i=3
-            while [ "$i" -gt 0 ] && [ "$file_ok" == "false" ]; do
+            while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
                 read -rp "Introduzca el nombre del fichero (.freq) del que quiere cargar el análisis: " freq_file
                 tfidf_file="${freq_file%.*}.tfidf"
                 if [ -z "$freq_file" ]; then
@@ -296,25 +302,25 @@ while true; do
                     echo "El fichero no existe. Le quedan $i intentos."
                 elif [ -f "$tfidf_file" ] && [ -s "$tfidf_file" ]; then
                     j=3
-                    input_valid="false"
-                    tfidf_file_is_valid="true"
+                    input_valid=0
+                    tfidf_file_is_valid=1
                     while IFS= read -r linea; do
                         # Verifica si la línea no está vacía
                         if [[ -n $linea ]]; then
                             # Verifica si el fichero tiene el formato correcto
                             if [[ ! $linea =~ ^(-?[0-9]+(\.[0-9]*)?(:-?[0-9]*(\.-?[0-9]*)*)*):$ ]]; then
-                                tfidf_file_is_valid="false"
+                                tfidf_file_is_valid=0
                             fi
                         fi
                     done <"$tfidf_file"
 
-                    if [ "$tfidf_file_is_valid" == "false" ]; then
+                    if [ "$tfidf_file_is_valid" -eq 0 ]; then
                         echo "🚩 Advertencia: Se ha encontrado un fichero .tfidf no valido para el fichero .freq introducido."
                         echo "                   Por favor, revise el fichero en en el caso de que quiera utilizarlo para una nueva predicción."
                         continue
                     fi
 
-                    while [ "$j" -gt 0 ] && [ "$input_valid" == "false" ] && [ "$tfidf_file_is_valid" == "true" ]; do
+                    while [ "$j" -gt 0 ] && [ "$input_valid" -eq 0 ] && [ "$tfidf_file_is_valid" -eq 1 ]; do
                         echo "Se ha encontrado un fichero con extensión .tfidf para el fichero .freq introducido, ¿Desea cargarlo para una nueva predicción?"
                         echo "s 👉 El fichero con la matriz TF-IDF se utilizará para calcular una nueva predicción"
                         echo "n 👉 El fichero con la matriz TF-IDF se borrará y se volverá a realizar el calculo del TF-IDF y la predicción"
@@ -324,14 +330,14 @@ while true; do
                             ((j--))
                             echo "Entrada invalida. Le quedan $j intentos."
                         elif [ "$input" == "s" ]; then
-                            load_tfidf="true"
-                            input_valid="true"
-                            file_ok="true"
+                            load_tfidf=1
+                            input_valid=1
+                            file_ok=1
                         elif [ "$input" == "n" ]; then
                             rm "$tfidf_file"
-                            load_tfidf="false"
-                            input_valid="true"
-                            file_ok="true"
+                            load_tfidf=0
+                            input_valid=1
+                            file_ok=1
                         else
                             ((j--))
                             echo "Entrada invalida. Le quedan $j intentos."
@@ -341,16 +347,16 @@ while true; do
 
                 elif [ -e "$freq_file" ]; then
                     # Compruebo si el fichero sigue le formato correcto
-                    valid_format="true"
+                    valid_format=1
                     while IFS= read -r linea; do
                         if [[ -n $linea ]]; then
                             if [[ ! $linea =~ ^(-?[0-9]+(:-?[0-9]+)*):$ ]]; then
-                               valid_format="false"
+                               valid_format=0
                             fi
                         fi
                     done <"$freq_file"
-                    if [ "$valid_format" == "true" ]; then
-                        file_ok="true"
+                    if [ "$valid_format" -eq 1 ]; then
+                        file_ok=1
                     else
                        ((i--))
                         echo "El fichero no sigue un formato valido. Le quedan $i intentos."
@@ -359,12 +365,12 @@ while true; do
                 fi
 
                 if [ "$i" -eq 0 ]; then
-                    return_to_menu="true"
+                    return_to_menu=1
                     break
                 fi
             done
 
-            if [ "$return_to_menu" == "true" ]; then
+            if [ "$return_to_menu" -eq 1 ]; then
                 read -rp "Introduzca cualquier tecla para regresar al menú:" key
                 clear
                 continue
@@ -394,10 +400,10 @@ while true; do
 
             tfidf_matrix_rows="$i"
             cols=${#elements[@]}
-            freq_matrix_built="true"
+            freq_matrix_built=1
         fi
 
-        if [ "$freq_matrix_built" == "true" ]; then
+        if [ "$freq_matrix_built" -eq 1 ]; then
             # Crear el nuevo nombre de archivo con la extensión "tfidf"
             tfidf_file="${freq_file%.*}.tfidf"
 
@@ -412,7 +418,9 @@ while true; do
             done
 
             # Calcula TF-IDF
-            if [ "$load_tfidf" == "false" ] || [ "$use_current_analysis" == "s" ]; then
+            echo "load_tdidf= $load_tfidf"
+            echo "use_current_analysis= $use_current_analysis"
+            if [ "$load_tfidf" -eq 0 ] || [ "$use_current_analysis" -eq 1 ]; then
                 for ((i = 0; i < tfidf_matrix_rows; i++)); do
                     email_id="${tfidf_matrix["$i,0"]}"
                     progressBar "Calculando TF-IDF para el E-Mail $email_id" "$i" "$tfidf_matrix_rows"
@@ -435,7 +443,7 @@ while true; do
                 echo
                 echo
 
-            elif [ "$load_tfidf" == "true" ]; then
+            elif [ "$load_tfidf" -eq 1 ]; then
                 # Leer el archivo línea por línea
                 tfidf_matrix_rows="$(wc -l <"$tfidf_file")"
                 i=0
@@ -490,10 +498,8 @@ while true; do
         fi
         ;;
     3)
-        if [ "$analysis_completed" == "false" ]; then
-            #echo "Error: No se puede acceder a los informes sin realizar un análisis previo"
-            bannerColor "Error: No se puede acceder a los informes sin realizar un análisis previo" "red" "x"
-
+        if [ "$analysis_completed" -eq 0 ]; then
+            echo "⛔ Error: No se puede acceder a los informes sin realizar un análisis previo."
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
@@ -519,39 +525,39 @@ while true; do
                     read -rp "Introduzca cualquier tecla para regresar al menú de informes:" key
                     ;;
                 2)
-                    return_to_reports_menu="false"
-                    expression_found="false"
-                    expression_appears="false"
+                    return_to_reports_menu=0
+                    expression_found=0
+                    expression_appears=0
                     i=3
-                    while [ "$i" -gt 0 ] && [ "$expression_found" == "false" ]; do
+                    while [ "$i" -gt 0 ] && [ "$expression_found" -eq 0 ]; do
                         read -rp "Introduzca una expresión: " input
                         if [ -z "$input" ]; then
                             ((i--))
                             echo "Entrada invalida. Le quedan $i intentos."
                         else
                             j=3
-                            while IFS= read -r expression && [ "$expression_found" == "false" ]; do
+                            while IFS= read -r expression && [ "$expression_found" -eq 0 ]; do
                                 if [ "$expression" == "$input" ]; then
-                                    expression_found="true"
+                                    expression_found=1
                                 else
                                     ((j++))
                                 fi
                             done <"$expressions_file"
 
-                            if [ "$expression_found" == "false" ]; then
+                            if [ "$expression_found" -eq 0 ]; then
                                 ((i--))
                                 echo "Expresión no encontrada, le quedan $i intentos."
                             fi
                         fi
 
                         if [ "$i" -eq 0 ]; then
-                            return_to_reports_menu="true"
+                            return_to_reports_menu=1
                             break
                         fi
 
                     done
 
-                    if [ "$return_to_reports_menu" == "true" ]; then
+                    if [ "$return_to_reports_menu" -eq 1 ]; then
                         read -rp "Introduzca cualquier tecla para regresar al menú de informes:" key
                         clear
                         continue
@@ -560,7 +566,7 @@ while true; do
                     # Recorrer la matriz de analisis para buscar el correo que contenga el termino
                     for ((i = 0; i < freq_matrix_rows; i++)); do
                         if [ "${freq_matrix["$i,$j"]}" -gt 0 ]; then
-                            expression_appears="true"
+                            expression_appears=1
                             email_id="${freq_matrix["$i,0"]}"
                             while IFS= read -r line; do
                                 # Verifica si la línea comienza con el id
@@ -572,19 +578,19 @@ while true; do
                         fi
                     done
 
-                    if [ "$expression_appears" == "false" ]; then
+                    if [ "$expression_appears" -eq 0 ]; then
                         echo "La expresión $input no aparece en ningún correo eletrónico."
                         echo
                     fi
                     read -rp "Introduzca cualquier tecla para regresar al menú de informes:" key
                     ;;
                 3)
-                    return_to_reports_menu="false"
-                    email_found="false"
+                    return_to_reports_menu=0
+                    email_found=0
                     email_id=0
                     num_of_expressions=0
                     i=3
-                    while [ "$i" -gt 0 ] && [ "$email_found" == "false" ]; do
+                    while [ "$i" -gt 0 ] && [ "$email_found" -eq 0 ]; do
                         read -rp "Introduzca un identificador : " input
                         if [ -z "$input" ]; then
                             ((i--))
@@ -594,16 +600,16 @@ while true; do
                             echo "Entrada invalida. Le quedan $i intentos."
                         else
                             j=0
-                            while [ "$email_found" == "false" ]; do
+                            while [ "$email_found" -eq 0 ] && [ "$j" -lt "$freq_matrix_rows" ]; do
                                 email_id="${freq_matrix["$j,0"]}"
                                 if [ "$email_id" -eq "$input" ]; then
-                                    email_found="true"
+                                    email_found=1
                                 else
                                     ((j++))
                                 fi
                             done
 
-                            if [ "$email_found" == "false" ]; then
+                            if [ "$email_found" -eq 0 ]; then
                                 ((i--))
                                 echo "Correo electrónico no encontrado, le quedan $i intentos."
                             fi
@@ -611,13 +617,13 @@ while true; do
                         fi
 
                         if [ "$i" -eq 0 ]; then
-                            return_to_reports_menu="true"
+                            return_to_reports_menu=1
                             break
                         fi
 
                     done
 
-                    if [ "$return_to_reports_menu" == "true" ]; then
+                    if [ "$return_to_reports_menu" -eq 1 ]; then
                         read -rp "Introduzca cualquier tecla para regresar al menú de informes:" key
                         clear
                         continue
