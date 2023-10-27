@@ -3,7 +3,7 @@
 emails_file=""
 expressions_file=""
 freq_file=""
-tfidf_file""
+tfidf_file=""
 analysis_completed="false"
 declare -A freq_matrix
 declare -A tfidf_matrix
