@@ -1,39 +1,47 @@
 #!/usr/bin/bash
-declare -A prediction_matrix
-# Leer el archivo línea por línea
-k=0
-while IFS= read -r line; do
-    # Verificar si la línea está vacía
-    if [ -n "$line" ]; then
-        # Split de la línea en un array utilizando ":" como delimitador
-        IFS=":" read -ra elements <<<"$line"
 
-        email_id="${elements[0]}"
-        num_of_terms_in_email="${elements[1]}"
+# Function to get a valid file name with optional extension and structure checks
+validate_file() {
+    file_var="$1"
+    local prompt="$2"
+    local check_exists="$3"
+    local extension="$4"      # Optional extension check
+    local structure_regex="$5" # Optional structure regex
 
-        if [ "$num_of_terms_in_email" -gt 0 ]; then
-            for ((j = 0; j < ${#elements[@]}; j++)); do
-                prediction_matrix["$k,$j"]="${elements[j]}"
-            done
-            ((k++))
+    local i=3
+    while [ "$i" -gt 0 ]; do
+        read -rp "$prompt: " file_value
+
+        if [ -z "$file_value" ]; then
+            ((i--))
+            echo "🚩 Entrada inválida. Le quedan $i intentos."
+        elif [ -n "$extension" ] && [[ "$file_value" != *$extension ]]; then
+            ((i--))
+            echo "🚩 El fichero no tiene la extensión $extension. Le quedan $i intentos."
+        elif [ "$check_exists" = "true" ] && [ ! -f "$file_value" ]; then
+            ((i--))
+            echo "🚩 El fichero no existe. Le quedan $i intentos."
+        elif [ -n "$structure_regex" ] &&  grep -qvE "$structure_regex" "$file_value"; then
+            ((i--))
+            echo "🚫 El contenido del fichero no sigue la estructura requerida. Le quedan $i intentos."
         else
-            echo "Error. El E-Mail $email_id está vacío, no se tendrá en cuenta en el cálculo del TF-IDF."
+            eval "$file_var=\"$file_value\""
+            return 0
         fi
-    fi
 
-done <"analisis.freq"
-
-prediction_matrix_rows="$k"
-cols=${#elements[@]}
-
-echo "$cols"
-
-echo "Filas PM: $prediction_matrix_rows"
-
-# Imprimir la nueva matriz
-for ((i = 0; i < prediction_matrix_rows; i++)); do
-    for ((j = 0; j < ${#elements[@]}; j++)); do
-        echo -n "${prediction_matrix["$i,$j"]}:"
+        if [ "$i" -eq 0 ]; then
+            return 1
+        fi
     done
-    echo
-done
+}
+
+structure_regex='^[0-9]+\|.+$'
+emails_file=""
+
+# Optional extension and structure checks
+validate_file "emails_file" "Introduzca el nombre del fichero que contiene los correos electrónicos" "true" ".txt" "$structure_regex"
+
+echo "$emails_file"
+
+
+
