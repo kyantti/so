@@ -21,6 +21,9 @@ validate_file() {
         elif [ "$check_exists" = "true" ] && [ ! -f "$file_value" ]; then
             ((i--))
             echo "🚩 El fichero no existe. Le quedan $i intentos."
+        elif [ "$check_exists" = "false" ] && [ -f "$file_value" ]; then
+            ((i--))
+            echo "🚩 El fichero ya existe. Le quedan $i intentos."
         elif [ -n "$structure_regex" ] &&  grep -qvE "$structure_regex" "$file_value"; then
             ((i--))
             echo "🚫 El contenido del fichero no sigue la estructura requerida. Le quedan $i intentos."
