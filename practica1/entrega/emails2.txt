@@ -1,0 +1,9 @@
+1|Oferta especial solo por hoy! Compra ahora y ahorra dinero|1|
+2|Reunión de equipo a las 3 PM en la sala de conferencias|0|
+3|Gana un viaje gratis a destinos exóticos. ¡Regístrate ahora!|1|
+4|Recordatorio: Pago de factura pendiente de $100|0|
+5|Descuento del 20% en tu próxima compra con nosotros|1|
+6|¡Felicidades! Eres el ganador de nuestro concurso mensual|1|
+7|Actualización de política de privacidad y términos de servicio|0|
+8|           |0|
+9|Descuento del 20% en tu próxima compra con nosotros|1|

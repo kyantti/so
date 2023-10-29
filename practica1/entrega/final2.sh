@@ -4,6 +4,7 @@ emails_file=""
 expressions_file=""
 freq_file=""
 tfidf_file=""
+create_freq_file=0
 analysis_completed=0
 declare -A freq_matrix
 declare -A tfidf_matrix
@@ -27,6 +28,18 @@ function progressBar() {
 
     echo -ne "\r|${bar:0:$barPosition}$(tput dim)${space:$barPosition:20}$(tput sgr0)| ${wheel[wheelIndex]} ${position}% [ ${msg} ] "
 }
+
+# Usage: bannerSimple "my title" "*"
+function bannerSimple() {
+    local msg="${2} ${1} ${2}"
+    local edge
+    edge=${msg//?/$2}
+    echo "${edge}"
+    echo "$(tput bold)${msg}$(tput sgr0)"
+    echo "${edge}"
+    echo
+}
+
 
 # Usage: bannerColor "my title" "red" "*"
 function bannerColor() {
@@ -73,6 +86,81 @@ function bannerColor() {
     echo
 }
 
+verify_input_file() {
+    file_var="$1"
+    local prompt="$2"
+    local check_exists="$3"
+    local extension="$4"       
+    local structure_regex="$5" 
+
+    local i=3
+    while [ "$i" -gt 0 ]; do
+        read -rp "$prompt: " file_value
+
+        if [ -z "$file_value" ]; then
+            ((i--))
+            echo "🚩 Entrada inválida. Le quedan $i intentos."
+        elif [ -n "$extension" ] && [[ "$file_value" != *$extension ]]; then
+            ((i--))
+            echo "🚩 El fichero no tiene la extensión $extension. Le quedan $i intentos."
+        elif [ "$check_exists" = "true" ] && [ ! -f "$file_value" ]; then
+            ((i--))
+            echo "🚩 El fichero no existe. Le quedan $i intentos."
+        elif [ "$check_exists" = "false" ] && [ -f "$file_value" ]; then
+            ((i--))
+            echo "🚩 El fichero ya existe. Le quedan $i intentos."
+        elif [ -n "$structure_regex" ] && grep -qvE "$structure_regex" "$file_value"; then
+            ((i--))
+            echo "🚫 El contenido del fichero no sigue la estructura requerida. Le quedan $i intentos."
+        else
+            eval "$file_var=\"$file_value\""
+            return 0
+        fi
+
+        if [ "$i" -eq 0 ]; then
+            return 1
+        fi
+    done
+}
+
+validate_choice() {
+    local prompt="$1"
+
+    local i=3
+    while [ "$i" -gt 0 ]; do
+        read -rp "$prompt: " choice
+
+        if [ "$choice" == "s" ]; then
+            return 1
+        elif [ "$choice" == "n" ]; then
+            return 0
+        else
+            ((i--))
+            echo "🚩 Entrada inválida. Le quedan $i intentos."
+        fi
+
+        if [ "$i" -eq 0 ]; then
+            return 2
+        fi
+    done
+}
+
+validate_matrix_file() {
+    local file="$1"
+    local structure_regex="$2"
+    while IFS= read -r linea; do
+        # Verifica si la línea no está vacía
+        if [[ -n $linea ]]; then
+            # Verifica si el fichero tiene el formato correcto
+            if [[ ! $linea =~ $structure_regex ]]; then
+                return 0
+            fi
+        fi
+    done <"$file"
+
+    return 1
+}
+
 clean_text() {
     input="$1"
     cleaned_text=$(echo "$input" | awk '{print tolower($0)}' | awk '{ gsub(/[^[:alnum:] ]/, " "); gsub(/  +/, " "); gsub(/\<[0-9]+\>/, ""); gsub(/[0-9]+[^[:alnum:]]|[0-9]+$/, ""); print }' | tr -s ' ')
@@ -82,109 +170,56 @@ clean_text() {
 while true; do
     echo "Menú:"
     echo
-    echo "1. Análisis de datos"
-    echo "2. Predicción"
-    echo "3. Informes de resultados"
-    echo "4. Ayuda"
-    echo "5. Salir"
+    echo "1. 🩺 Análisis de datos"
+    echo "2. 🔮 Predicción"
+    echo "3. 📋 Informes de resultados"
+    echo "4. 🆘 Ayuda"
+    echo "5. 🚪 Salir"
     echo
     read -rp "Seleccione una opción (1-5): " choice
 
     case $choice in
     1)
-        return_to_menu=0
-        file_ok=0
-        i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
-            read -rp "Introduzca el nombre del fichero que contiene los correos electrónicos: " emails_file
+        verify_input_file "emails_file" "📧 Introduzca el nombre del fichero que contiene los correos electrónicos" "true" ".txt" '^[0-9]+\|.+$'
 
-            if [ -z "$emails_file" ]; then
-                ((i--))
-                echo "🚩 Entrada invalida. Le quedan $i intentos."
-            elif [ ! -f "$emails_file" ]; then
-                ((i--))
-                echo "🚩 El fichero no existe. Le quedan $i intentos."
-            elif grep -qvE '^[0-9]+\|.+$' "$emails_file"; then
-                ((i--))
-                echo "🚫 El contenido del fichero no sigue la estructura requerida (Identificador|Contenido del correo electrónico). Le quedan $i intentos."
-            else
-                file_ok=1
-            fi
-            if [ "$i" -eq 0 ]; then
-                return_to_menu=1
-                break
-            fi
-        done
-
-        if [ "$return_to_menu" -eq 1 ]; then
+        if [ $? -eq 1 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
         fi
 
-        return_to_menu=0
-        file_ok=0
-        i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
-            read -rp "Introduzca el nombre del fichero que contiene las expresiones sospechosas: " expressions_file
-            if [ -z "$expressions_file" ]; then
-                ((i--))
-                echo "🚩 Entrada invalida. Le quedan $i intentos."
-            elif [ ! -f "$expressions_file" ]; then
-                ((i--))
-                echo "🚩 El fichero no existe. Le quedan $i intentos."
-            elif [ "$expressions_file" == "$emails_file" ]; then
-                ((i--))
-                echo "🚫 El fichero no puede ser el mismo que el que contiene los correos electrónicos. Le quedan $i intentos."
-            else
-                file_ok=1
-            fi
+        verify_input_file "expressions_file" "📃 Introduzca el nombre del fichero que contiene las expresiones sospechosas" "true" ".txt"
 
-            if [ "$i" -eq 0 ]; then
-                return_to_menu=1
-                break
-            fi
-
-        done
-
-        if [ "$return_to_menu" -eq 1 ]; then
+        if [ $? -eq 1 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
         fi
 
-        return_to_menu=0
-        file_ok=0
-        i=3
-        while [ "$i" -gt 0 ] && [ "$file_ok" -eq 0 ]; do
-            read -rp "Introduzca el nombre del fichero donde se escribirá el análisis de los correos electrónicos. (.freq): " freq_file
-            if [ -z "$freq_file" ]; then
-                ((i--))
-                echo "🚩 Entrada invalida. Le quedan $i intentos."
-            elif [ -e "$freq_file" ]; then
-                ((i--))
-                echo "🚩 El fichero ya existe. Le quedan $i intentos."
-            elif [[ "$freq_file" != *.freq ]]; then
-                ((i--))
-                echo "🚩 El fichero no tiene extension .freq. Le quedan $i intentos."
-            else
-                file_ok=1
+        echo "📊 ¿Desea crear un fichero .freq donde se escribirá el análisis de los correos electrónicos?"
+        echo "   Si posteriormente desea realizar una predicción este fichero es necesario"
+        echo "   Si por el contrario solo desea acceder a los informes puede prescindir del fichero"
+        validate_choice "   Introduzca una opción (s/n)"
+        create_freq_file=$?
+
+        if [ "$create_freq_file" -eq 1 ]; then
+            verify_input_file "freq_file" "📊 Introduzca el nombre del fichero (.freq) donde se escribirá el análisis de los correos electrónicos" "false" ".freq"
+
+            if [ $? -eq 1 ]; then
+                read -rp "Introduzca cualquier tecla para regresar al menú:" key
+                clear
+                continue
             fi
 
-            if [ "$i" -eq 0 ]; then
-                return_to_menu=1
-                break
-            fi
-
-        done
-
-        if [ "$return_to_menu" -eq 1 ]; then
+        elif [ "$create_freq_file" -eq 2 ]; then
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
             clear
             continue
         fi
 
         total_emails=$(wc -l <"$emails_file")
+
+        # Analisis
         i=0
         while IFS="|" read -r email_id email_content spam_or_ham blank; do
             cleaned_email_content=$(clean_text "$email_content")
@@ -196,24 +231,32 @@ while true; do
             j=3
             while read -r expression; do
                 cleaned_expression=$(clean_text "$expression")
-                count=$(echo "$cleaned_email_content" | grep -o "$cleaned_expression" | wc -l | tr -d '[:space:]')
+                count=$(echo "$cleaned_email_content" | grep -wo "$cleaned_expression" | wc -l)
                 freq_matrix["$i,$j"]="$count"
                 ((j++))
             done <"$expressions_file"
             ((i++))
         done <"$emails_file"
+
         freq_matrix_rows=$i
         cols=$j
         analysis_completed=1
 
+        progressBar "✅ Análisis completado con éxito" "$total_emails" "$total_emails"
+        echo
 
-        # Imprime la matriz freq en el fichero
-        for((i=0;i<freq_matrix_rows;i++)); do
-            for((j=0;j<cols;j++)); do
-                echo -n "${freq_matrix["$i,$j"]}:" >> "$freq_file"
+        if [ "$create_freq_file" -eq 1 ]; then
+            # Imprime la matriz freq en el fichero
+            for ((i = 0; i < freq_matrix_rows; i++)); do
+                for ((j = 0; j < cols; j++)); do
+                    echo -n "${freq_matrix["$i,$j"]}:" >>"$freq_file"
+                done
+                echo >>"$freq_file"
             done
-            echo >> "$freq_file"
-        done
+
+            bannerColor "🗃️ Matriz de frecuencias guardada en: $(pwd)/$freq_file" "black" "*"
+            echo
+        fi
 
         # Recorre la matriz y cuenta los valores mayores que 0 en cada columna
         for ((j = 3; j < cols; j++)); do
@@ -224,41 +267,38 @@ while true; do
                 fi
             done
         done
-        progressBar "✅ Análisis completado con éxito" "$total_emails" "$total_emails"
-        echo
-        bannerColor "📄 Matriz de análisis guardada en: $(pwd)/$freq_file" "black" "*"
-        echo
+        
         read -rp "Introduzca cualquier tecla para regresar al menú:" key
         ;;
     2)
         use_current_analysis=0
         return_to_menu=0
         freq_matrix_built=0
-        input_ok=0
         load_tfidf=0
 
         if [ "$analysis_completed" -eq 1 ]; then
-            i=3
-            while [ "$i" -gt 0 ] && [ "$input_ok" -eq 0 ]; do
-                read -rp "Se ha encontrado un análisis en la ejecución. ¿Desea utilizarlo? (s/n):" input
-                if [ "$input" == "s" ]; then
-                    use_current_analysis=1
-                    input_ok=1
-                    echo "Usando el análisis encontrado en la ejecución."
-                elif [ "$input" == "n" ]; then
-                    use_current_analysis=0
-                    input_ok=1
-                else
-                    ((i--))
-                    echo "Respuesta no válida. Le quedan $i intentos."
-                fi
-                if [ "$i" -eq 0 ]; then
-                    return_to_menu=1
-                    break
-                fi
-            done
 
-            if [ "$return_to_menu" -eq 1 ]; then
+            if [ "$create_freq_file" -eq 0 ]; then
+                echo "🔎 🚩 Se ha encontrado un análisis en la ejecución pero no existe fichero de frecuencias (.freq)."
+                echo "      Vuelva a realizar el análisis y aseguresé de crear el fichero de frecuencias (.freq)"
+                validate_choice "      ¿Desea cargar un fichero de frecuencias para realizar una una predicción? (s/n)"
+                choice=$?
+                
+                if [ "$choice" -eq 1 ]; then
+                    use_current_analysis=0
+                else
+                    read -rp "Introduzca cualquier tecla para regresar al menú:" key
+                    clear
+                    continue
+                fi
+                
+                 
+            elif [ "$create_freq_file" -eq 1 ]; then
+                validate_choice "🔎 Se ha encontrado un análisis en la ejecución. ¿Desea utilizarlo? (s/n)"
+                use_current_analysis=$?
+            fi
+            
+            if [ "$use_current_analysis" -eq 2 ]; then
                 read -rp "Introduzca cualquier tecla para regresar al menú:" key
                 clear
                 continue
@@ -279,7 +319,7 @@ while true; do
                     done
                     ((k++))
                 else
-                    echo "🤓 👉 Advertencia: El E-Mail $email_id esta vacio, no se tendra en cuenta en cuenta para el calculo del TF-IDF."
+                    echo "⚠️ Advertencia: El E-Mail $email_id esta vacio, no se tendra en cuenta en cuenta para el calculo del TF-IDF."
                 fi
             done
             tfidf_matrix_rows="$k"
@@ -296,39 +336,34 @@ while true; do
                 tfidf_file="${freq_file%.*}.tfidf"
                 if [ -z "$freq_file" ]; then
                     ((i--))
-                    echo "Entrada invalida. Le quedan $i intentos."
+                    echo "🚩 Entrada invalida. Le quedan $i intentos."
                 elif [ ! -f "$freq_file" ]; then
                     ((i--))
-                    echo "El fichero no existe. Le quedan $i intentos."
+                    echo "🚩 El fichero no existe. Le quedan $i intentos."
                 elif [ -f "$tfidf_file" ] && [ -s "$tfidf_file" ]; then
                     j=3
                     input_valid=0
-                    tfidf_file_is_valid=1
-                    while IFS= read -r linea; do
-                        # Verifica si la línea no está vacía
-                        if [[ -n $linea ]]; then
-                            # Verifica si el fichero tiene el formato correcto
-                            if [[ ! $linea =~ ^(-?[0-9]+(\.[0-9]*)?(:-?[0-9]*(\.-?[0-9]*)*)*):$ ]]; then
-                                tfidf_file_is_valid=0
-                            fi
-                        fi
-                    done <"$tfidf_file"
+
+                    validate_matrix_file "$tfidf_file" '^(-?[0-9]+(\.[0-9]*)?(:-?[0-9]*(\.-?[0-9]*)*)*):$'
+                    tfidf_file_is_valid=$?
 
                     if [ "$tfidf_file_is_valid" -eq 0 ]; then
                         echo "🚩 Advertencia: Se ha encontrado un fichero .tfidf no valido para el fichero .freq introducido."
                         echo "                Por favor, revise el fichero en en el caso de que quiera utilizarlo para una nueva predicción."
                         continue
-                    fi
-
-                    while [ "$j" -gt 0 ] && [ "$input_valid" -eq 0 ] && [ "$tfidf_file_is_valid" -eq 1 ]; do
+                    else
                         echo "Se ha encontrado un fichero con extensión .tfidf para el fichero .freq introducido, ¿Desea cargarlo para una nueva predicción?"
                         echo "s 👉 El fichero con la matriz TF-IDF se utilizará para calcular una nueva predicción"
                         echo "n 👉 El fichero con la matriz TF-IDF se borrará y se volverá a realizar el calculo del TF-IDF y la predicción"
+                    fi
+
+                    while [ "$j" -gt 0 ] && [ "$input_valid" -eq 0 ] && [ "$tfidf_file_is_valid" -eq 1 ]; do
+
                         read -rp "Seleccione una opción (s/n): " input
 
                         if [ -z "$input" ]; then
                             ((j--))
-                            echo "Entrada invalida. Le quedan $j intentos."
+                            echo "🚩 Entrada invalida. Le quedan $j intentos."
                         elif [ "$input" == "s" ]; then
                             load_tfidf=1
                             input_valid=1
@@ -340,34 +375,28 @@ while true; do
                             file_ok=1
                         else
                             ((j--))
-                            echo "Entrada invalida. Le quedan $j intentos."
+                            echo "🚩 Entrada invalida. Le quedan $j intentos."
                         fi
 
                     done
 
                 elif [ -e "$freq_file" ]; then
                     # Compruebo si el fichero sigue le formato correcto
-                    valid_format=1
-                    while IFS= read -r linea; do
-                        if [[ -n $linea ]]; then
-                            if [[ ! $linea =~ ^(-?[0-9]+(:-?[0-9]+)*):$ ]]; then
-                               valid_format=0
-                            fi
-                        fi
-                    done <"$freq_file"
-                    if [ "$valid_format" -eq 1 ]; then
+                    validate_matrix_file "$freq_file" '^(-?[0-9]+(:-?[0-9]+)*):$'
+                    is_freq_file_valid=$?
+                    if [ "$is_freq_file_valid" -eq 1 ]; then
                         file_ok=1
                     else
-                       ((i--))
-                        echo "El fichero no sigue un formato valido. Le quedan $i intentos."
+                        ((i--))
+                        echo "🚩 El fichero no sigue un formato valido. Le quedan $i intentos."
                     fi
-
                 fi
 
                 if [ "$i" -eq 0 ]; then
                     return_to_menu=1
                     break
                 fi
+
             done
 
             if [ "$return_to_menu" -eq 1 ]; then
@@ -392,7 +421,7 @@ while true; do
                         done
                         ((i++))
                     else
-                        echo "🤓 👉 Advertencia: El E-Mail $email_id está vacío, no se tendrá en cuenta en el cálculo del TF-IDF."
+                        echo "⚠️ Advertencia: El E-Mail $email_id está vacío, no se tendrá en cuenta en el cálculo del TF-IDF."
                     fi
                 fi
 
@@ -492,7 +521,7 @@ while true; do
                 echo >>"$tfidf_file"
             done
 
-            bannerColor "📄 Matriz TF-IDF guardada en: $(pwd))/$tfidf_file" "black" "*"
+            bannerColor "🗃️ Matriz TF-IDF guardada en: $(pwd))/$tfidf_file" "black" "*"
             echo
             read -rp "Introduzca cualquier tecla para regresar al menú:" key
         fi
@@ -533,7 +562,7 @@ while true; do
                         read -rp "Introduzca una expresión: " input
                         if [ -z "$input" ]; then
                             ((i--))
-                            echo "Entrada invalida. Le quedan $i intentos."
+                            echo "🚩 Entrada invalida. Le quedan $i intentos."
                         else
                             j=3
                             while IFS= read -r expression && [ "$expression_found" -eq 0 ]; do
@@ -594,10 +623,10 @@ while true; do
                         read -rp "Introduzca un identificador : " input
                         if [ -z "$input" ]; then
                             ((i--))
-                            echo "Entrada invalida. Le quedan $i intentos."
+                            echo "🚩 Entrada invalida. Le quedan $i intentos."
                         elif [[ ! "$input" =~ ^[0-9]+$ ]]; then
                             ((i--))
-                            echo "Entrada invalida. Le quedan $i intentos."
+                            echo "🚩 Entrada invalida. Le quedan $i intentos."
                         else
                             j=0
                             while [ "$email_found" -eq 0 ] && [ "$j" -lt "$freq_matrix_rows" ]; do
@@ -653,8 +682,15 @@ while true; do
 
         ;;
     4)
-        echo "=== Ayuda ==="
+
+        bannerSimple "Ayuda" "*"
+        echo
         echo "Esta aplicación realiza análisis de correos electrónicos para identificar spam."
+        echo "Para ello utiliza la metrica TF-IDF (Term Frequency-Inverse Document Frequency), una medida numérica utilizada para evaluar la relevancia de palabras"
+        echo "en un documento en relación con una colección de documentos. Se emplea en la recuperación de información y la minería de texto, especialmente en motores"
+        echo "de búsqueda. La idea es que el valor tf-idf aumenta con la frecuencia de una palabra en un documento pero disminuye si la palabra es común en la colección,"
+        echo "lo que permite priorizar palabras más significativas."
+        echo
         echo "Opciones disponibles:"
         echo "1. Análisis de datos: Realiza el análisis de frecuencia de palabras en los correos."
         echo "2. Predicción: Calcula la métrica TF-IDF y predice si un correo es spam o ham."
