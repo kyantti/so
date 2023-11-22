@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
         printf("Proceso hijo con id. de proceso: %d e id. del proceso padre %d\n", getpid(), getppid());
     default:
         printf("Proceso padre (invocador) con id. de proceso: %d e id. del proceso padre %d\n", getpid(), getppid());
-        system("ps -o user,pid,ppid,cmd");
+        //system("ps -o user,pid,ppid,cmd");
         break;
     }
     return 0;
