@@ -5,24 +5,25 @@
 #include <sys/wait.h>
 
 #define ROWS 15
-#define COLS 1000
+#define COLS 10
 
-int level_two_process(int, int);
-int level_three_process(int);
+// Function prototypes
+int level_two_process(int (*matrix)[COLS], int start_row, int end_row);
+int level_three_process(int (*matrix)[COLS], int row);
 
 int main()
 {
     int matrix[ROWS][COLS];
     pid_t pid;
 
-    // Create the matrix
+    /* Create the matrix
     for (int i = 0; i < ROWS; i++)
     {
         for (int j = 0; j < COLS; j++)
         {
             matrix[i][j] = i * COLS + j;
         }
-    }
+    }*/
 
     // Create 3 level two child processes
     for (int i = 0; i < 3; i++)
@@ -36,7 +37,7 @@ int main()
         }
         else if (pid == 0)
         {
-            pid = level_two_process(i * 5, (i + 1) * 5);
+            pid = level_two_process(matrix, i * 5, (i + 1) * 5);
             exit(EXIT_SUCCESS);
         }
         else
@@ -48,12 +49,23 @@ int main()
 
     // Parent process
 
+    // Print the final result
+    printf("Final result in the main process:\n");
+    for (int i = 0; i < ROWS; i++)
+    {
+        for (int j = 0; j < COLS; j++)
+        {
+            printf("%d ", matrix[i][j]);
+        }
+        printf("\n");
+    }
     // Add your parent process logic here
 
     return 0;
 }
 
-int level_two_process(int start_row, int end_row)
+// Function definitions
+int level_two_process(int (*matrix)[COLS], int start_row, int end_row)
 {
     pid_t pid;
 
@@ -71,7 +83,7 @@ int level_two_process(int start_row, int end_row)
         }
         else if (pid == 0)
         {
-            pid = level_three_process(i);
+            pid = level_three_process(matrix, i);
             exit(EXIT_SUCCESS);
         }
         else
@@ -82,9 +94,23 @@ int level_two_process(int start_row, int end_row)
     return 0;
 }
 
-int level_three_process(int row)
+int level_three_process(int (*matrix)[COLS], int row)
 {
     printf("Soy el proceso hijo de nivel 3 %d, mi padre es %d y me voy a encargar de la fila %d\n", getpid(), getppid(), row);
+
+    // Access matrix[row] in level_three_process
+    for (int j = 0; j < COLS; j++)
+    {
+        matrix[row][j] = row * COLS + j;
+    }
+
+    printf("Row %d: ", row);
+    // Print the initialized row
+    for (int j = 0; j < COLS; j++)
+    {
+        printf("%d ", matrix[row][j]);
+    }
+    printf("\n");
 
     // Add your level three process logic here
 
