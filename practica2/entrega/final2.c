@@ -8,35 +8,22 @@
 
 #define ROWS 15
 #define COLS 10
-#define NUM_SONS 3
-
-// Define a struct to store matrix and total primes
-struct SharedData {
-    int matrix[ROWS][COLS];
-    int total_primes[NUM_SONS];
-};
 
 // Function prototypes
-void level_two_process(struct SharedData *shared_data, int start_row, int end_row, int son_index);
-void level_three_process(struct SharedData *shared_data, int row, int process_id, int son_index);
+void level_two_process(int shmid, int start_row, int end_row);
+void level_three_process(int shmid, int row, int process_id);
 int is_prime(int num);
 
 int main()
 {
     int shmid;
-    struct SharedData *shared_data;
+    int *matrix;
     pid_t pid;
     int start_row;
     int end_row;
 
-    system("rm -r level_2_processes");
-    system("rm -r level_3_processes");
-    // Create the "level_3_processes" folder using a system command
-    system("mkdir level_2_processes");
-    system("mkdir level_3_processes");
-
-    // Create shared memory segment for the matrix and total primes
-    shmid = shmget(IPC_PRIVATE, sizeof(struct SharedData), IPC_CREAT | 0666);
+    // Create shared memory segment for the matrix
+    shmid = shmget(IPC_PRIVATE, sizeof(int) * ROWS * COLS, IPC_CREAT | 0666);
     if (shmid == -1)
     {
         perror("shmget");
@@ -44,8 +31,8 @@ int main()
     }
 
     // Attach the shared memory segment
-    shared_data = shmat(shmid, NULL, 0);
-    if (shared_data == (struct SharedData *)-1)
+    matrix = shmat(shmid, NULL, 0);
+    if (matrix == (int *)-1)
     {
         perror("shmat");
         exit(EXIT_FAILURE);
@@ -56,21 +43,15 @@ int main()
     {
         for (int j = 0; j < COLS; j++)
         {
-            shared_data->matrix[i][j] = i * COLS + j;
+            matrix[i * COLS + j] = i * COLS + j;
         }
     }
 
-    // Initialize total primes to zero
-    for (int i = 0; i < NUM_SONS; i++)
-    {
-        shared_data->total_primes[i] = 0;
-    }
-
     // Create 3 level two child processes
-    for (int i = 0; i < NUM_SONS; i++)
+    for (int i = 0; i < 3; i++)
     {
-        start_row = i * (ROWS / NUM_SONS);
-        end_row = (i + 1) * (ROWS / NUM_SONS) - 1;
+        start_row = i * 5;
+        end_row = (i + 1) * 5 - 1;
 
         pid = fork();
 
@@ -81,7 +62,7 @@ int main()
         }
         else if (pid == 0)
         {
-            level_two_process(shared_data, start_row, end_row, i);
+            level_two_process(shmid, start_row, end_row);
             exit(EXIT_SUCCESS);
         }
         else
@@ -93,20 +74,14 @@ int main()
 
     // Parent process
 
-    // Print total primes computed by each son
-    printf("Total primes computed by each son:\n");
-    for (int i = 0; i < NUM_SONS; i++)
-    {
-        printf("Son %d: %d primes\n", i + 1, shared_data->total_primes[i]);
-    }
-
-    // Detach and remove the shared memory segment
-    if (shmdt(shared_data) == -1)
+    // Detach the shared memory segment
+    if (shmdt(matrix) == -1)
     {
         perror("shmdt");
         exit(EXIT_FAILURE);
     }
 
+    // Remove the shared memory segment
     if (shmctl(shmid, IPC_RMID, NULL) == -1)
     {
         perror("shmctl");
@@ -117,10 +92,19 @@ int main()
 }
 
 // Function definitions
-void level_two_process(struct SharedData *shared_data, int start_row, int end_row, int son_index)
+void level_two_process(int shmid, int start_row, int end_row)
 {
+    // Attach the shared memory segment
+    int *matrix = shmat(shmid, NULL, 0);
     pid_t pid;
+    int total_primes = 0;
     int child_status = 0;
+
+    if (matrix == (int *)-1)
+    {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
 
     printf("Soy el proceso hijo de nivel 2 %d, mi padre es %d y me voy a encargar de las filas %d a %d\n", getpid(), getppid(), start_row, end_row);
 
@@ -136,7 +120,7 @@ void level_two_process(struct SharedData *shared_data, int start_row, int end_ro
         }
         else if (pid == 0)
         {
-            level_three_process(shared_data, i, getpid(), son_index);
+            level_three_process(shmid, i, getpid());
             // No es necesario salir aquí, ya que level_three_process manejará la salida
         }
         else
@@ -147,39 +131,39 @@ void level_two_process(struct SharedData *shared_data, int start_row, int end_ro
             // Verifico que el hijo haya terminado exitosamente
             if (WIFEXITED(child_status))
             {
-                shared_data->total_primes[son_index] += WEXITSTATUS(child_status);
+                total_primes += WEXITSTATUS(child_status);
             }
+
         }
     }
 
-    printf("Soy el proceso hijo de nivel 2 %d. Mis 5 hijos han encontrado un total de %d numeros primos\n", getpid(), shared_data->total_primes[son_index]);
-
-    // Write operations to the file "N2_pid.primos"
-    char filename[50];
-    sprintf(filename, "level_2_processes/N2_%d.primos", getpid());
-    FILE *file = fopen(filename, "w");
-
-    fprintf(file, "Inicio de ejecucion\n");
-    fprintf(file, "Identificacion de procesos creados: %d, %d, %d, %d, %d\n",getpid() + 1, getpid() + 2, getpid() + 3, getpid() + 4, getpid() + 5);
-    fprintf(file, "Resultado total enviado por sus hijos: %d\n", shared_data->total_primes[son_index]);
+    printf("Soy el proceso hijo de nivel 2 %d. Mis 5 hijos han encontrado un total de %d numeros primos\n", getpid(), total_primes);
 }
 
-void level_three_process(struct SharedData *shared_data, int row, int process_id, int son_index)
+void level_three_process(int shmid, int row, int process_id)
 {
+    // Attach the shared memory segment
+    int *matrix = shmat(shmid, NULL, 0);
     int prime_count = 0;
     char filename[50];
+
+    if (matrix == (int *)-1)
+    {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
 
     // Access matrix[row] in level_three_process and count prime numbers
     for (int j = 0; j < COLS; j++)
     {
-        if (is_prime(shared_data->matrix[row][j]))
+        if (is_prime(matrix[row * COLS + j]))
         {
             prime_count++;
 
             // Store the prime number in the file
-            sprintf(filename, "level_3_processes/N3_%d.cousins", getpid());
+            sprintf(filename, "N3_%d.cousins", getpid());
             FILE *file = fopen(filename, "a");
-            fprintf(file, "level:%d:process_id:%d:cousin_num:%d\n", 3, process_id, shared_data->matrix[row][j]);
+            fprintf(file, "level:%d:process_id:%d:cousin_num:%d\n", 3, process_id, matrix[row * COLS + j]);
             fclose(file);
         }
     }
