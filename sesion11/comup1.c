@@ -41,10 +41,12 @@ int main(int argc, char *argv[])
 	case 0:
 		// armado de las señales en el hijo. Armar señales es lo primero que debe hacer un proceso
 		// armado señal SIGTERM para finalizar
+		
 		a.sa_handler = manejador_senial_sigterm;
 		sigemptyset(&a.sa_mask);
 		a.sa_flags = 0;
 		sigaction(SIGTERM, &a, NULL);
+
 		// armado señal SIGINT para leer de la tuberia
 		a.sa_handler = manejador_senial_sigint;
 		sigemptyset(&a.sa_mask);

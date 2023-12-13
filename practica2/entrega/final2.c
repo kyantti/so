@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -8,169 +9,299 @@
 
 #define ROWS 15
 #define COLS 10
+#define NUM_CHILDS 3
+#define N1_FILENAME "n1/N1_%d.primos"
+#define N2_FILENAME "n2/N2_%d.primos"
+#define N3_FILENAME "n3/N3_%d.primos"
 
-// Function prototypes
-void level_two_process(int shmid, int start_row, int end_row);
-void level_three_process(int shmid, int row, int process_id);
+int matrix[ROWS][COLS];
+int pipe_fd[2];
+
+void level_two_process(int *total_primes, int start_row, int end_row);
+void level_three_process(int row);
 int is_prime(int num);
+void sigusr1_signal_handler(int signum);
+void sigint_signal_handler(int signum);
 
 int main()
 {
     int shmid;
-    int *matrix;
+    struct sigaction sa;
     pid_t pid;
+    pid_t child_pids[NUM_CHILDS];
     int start_row;
     int end_row;
+    int *total_primes;
+    int result;
+    key_t key;
+    char filename[50];
+    FILE *file;
 
-    // Create shared memory segment for the matrix
-    shmid = shmget(IPC_PRIVATE, sizeof(int) * ROWS * COLS, IPC_CREAT | 0666);
+    // Si existen, elimino los directorios de salida y sus archivos
+    system("rm -rf n1 n2 n3");
+    system("mkdir n1 n2 n3");
+
+    sprintf(filename, N1_FILENAME, getpid());
+    file = fopen(filename, "a");
+    if (file == NULL)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        fprintf(file, "Inicio de ejecucion\n");
+        fclose(file);
+    }
+
+    // Obtencion de la clave unica
+    key = ftok("/bin/cat", 121);
+
+    // Reserva de espacio 3 valores enteros y devuelve un identificador
+    shmid = shmget(key, sizeof(int) * 3, 0777 | IPC_CREAT);
     if (shmid == -1)
     {
-        perror("shmget");
+        perror("Error allocating space in shared memory");
         exit(EXIT_FAILURE);
     }
 
-    // Attach the shared memory segment
-    matrix = shmat(shmid, NULL, 0);
-    if (matrix == (int *)-1)
+    // Obtiene un puntero a la 1ª posición. Cada posición puede ser accedida como puntero[i]
+    total_primes = (int *)shmat(shmid, (char *)0, 0);
+    if (total_primes == (int *)-1)
     {
-        perror("shmat");
+        perror("Error obtaining the pointer to shared memory");
         exit(EXIT_FAILURE);
     }
 
-    // Initialize the matrix in the main process
+    // Creo la tuberia
+    if (pipe(pipe_fd) == -1)
+    {
+        perror("Error creating pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    // Armado de señal SIGUSR1 para leer de la tuberia
+    sa.sa_handler = sigusr1_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGUSR1, &sa, NULL) == -1)
+    {
+        perror("Error setting up the SIGUSR1 signal");
+        exit(EXIT_FAILURE);
+    }
+
+    // Inicializo la matriz
     for (int i = 0; i < ROWS; i++)
     {
         for (int j = 0; j < COLS; j++)
         {
-            matrix[i * COLS + j] = i * COLS + j;
+            matrix[i][j] = i * COLS + j;
         }
     }
 
-    // Create 3 level two child processes
-    for (int i = 0; i < 3; i++)
+    // Inicializo el total de primos de cada hijo a 0
+    for (int i = 0; i < NUM_CHILDS; i++)
     {
-        start_row = i * 5;
-        end_row = (i + 1) * 5 - 1;
+        total_primes[i] = 0;
+    }
+
+    // Creo 3 procesos de nivel 2
+    for (int i = 0; i < NUM_CHILDS; i++)
+    {
+        start_row = i * (ROWS / NUM_CHILDS);
+        end_row = (i + 1) * (ROWS / NUM_CHILDS) - 1;
 
         pid = fork();
 
         if (pid < 0)
         {
-            printf("Fork failed.\n");
+            perror("Error creating level 2 child process");
             exit(EXIT_FAILURE);
         }
         else if (pid == 0)
         {
-            level_two_process(shmid, start_row, end_row);
-            exit(EXIT_SUCCESS);
+            level_two_process(total_primes, start_row, end_row);
         }
         else
         {
-            printf("Proceso padre con ID %d, padre ID %d\n", getpid(), getppid());
-            wait(NULL);
+            child_pids[i] = pid;
+            file = fopen(filename, "a");
+            if (file == NULL)
+            {
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                fprintf(file, "He creado el proceso hijo %d para encargarse de las filas %d a %d\n", pid, start_row, end_row);
+                fclose(file);
+            }
         }
     }
 
-    // Parent process
-
-    // Detach the shared memory segment
-    if (shmdt(matrix) == -1)
+    // Espero a que los hijos de nivel 2 hagan su tarea
+    for (int i = 0; i < NUM_CHILDS; i++)
     {
-        perror("shmdt");
+        wait(NULL);
+    }
+
+    // Calculo el total de primos
+    result = 0;
+    for (int i = 0; i < NUM_CHILDS; i++)
+    {
+        result += total_primes[i];
+    }
+
+    // Antes de terminar el padre libera el puntero a memoria compartida
+    if (shmdt(total_primes) == -1)
+    {
+        perror("Error releasing the pointer to shared memory");
         exit(EXIT_FAILURE);
     }
 
-    // Remove the shared memory segment
-    if (shmctl(shmid, IPC_RMID, NULL) == -1)
+    // Elimina la zona de memoria compartida
+    if (shmctl(shmid, IPC_RMID, 0) == -1)
     {
-        perror("shmctl");
+        perror("Error deleting shared memory segment");
         exit(EXIT_FAILURE);
+    }
+
+    // Cierro la tuberia
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+
+    file = fopen(filename, "a");
+    if (file == NULL)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        fprintf(file, "Resultado total: %d\n", result);
+        fclose(file);
     }
 
     return 0;
 }
 
-// Function definitions
-void level_two_process(int shmid, int start_row, int end_row)
+// Cada proceso de nivel 2 se encarga de crear un proceso de nivel 3 para cada fila y esperar a que terminen de ejecutarse para obtener el total de primos y enviarlo al proceso padre.
+void level_two_process(int *total_primes, int start_row, int end_row)
 {
-    // Attach the shared memory segment
-    int *matrix = shmat(shmid, NULL, 0);
+    int child_index;
+    struct sigaction sa;
+    FILE *file;
     pid_t pid;
-    int total_primes = 0;
+    pid_t child_pids[ROWS];
     int child_status = 0;
+    char filename[50];
 
-    if (matrix == (int *)-1)
+    sa.sa_handler = sigint_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGINT, &sa, NULL) == -1)
     {
-        perror("shmat");
+        perror("Error setting up the SIGINT signal");
         exit(EXIT_FAILURE);
     }
 
-    printf("Soy el proceso hijo de nivel 2 %d, mi padre es %d y me voy a encargar de las filas %d a %d\n", getpid(), getppid(), start_row, end_row);
+    // Calculo el indice del hijo para saber a que posicion del array de primos enviar el resultado
+    child_index = start_row / (ROWS / NUM_CHILDS);
 
-    // Create a new process for each row
+    // Creo un proceso de nivel 3 para cada fila
     for (int i = start_row; i <= end_row; i++)
     {
         pid = fork();
 
         if (pid < 0)
         {
-            printf("Fork failed.\n");
+            perror("Error creating level 3 child process");
             exit(EXIT_FAILURE);
         }
         else if (pid == 0)
         {
-            level_three_process(shmid, i, getpid());
-            // No es necesario salir aquí, ya que level_three_process manejará la salida
+            // LLamo a la funcion que se encarga de calcular los primos de una fila,
+            // no es necesario salir aquí, ya que la propia función manejará la salida
+            level_three_process(i);
         }
         else
         {
-            // Espero a que el hijo termine de ejecutarse y obtengo su estado
+            // Guardo el pid del hijo para luego escribirlo en el archivo de salida
+            child_pids[i] = pid;
+
+            //  Espero a que el hijo termine de ejecutarse y obtengo su estado
             wait(&child_status);
 
             // Verifico que el hijo haya terminado exitosamente
             if (WIFEXITED(child_status))
             {
-                total_primes += WEXITSTATUS(child_status);
+                total_primes[child_index] += WEXITSTATUS(child_status);
             }
-
         }
     }
 
-    printf("Soy el proceso hijo de nivel 2 %d. Mis 5 hijos han encontrado un total de %d numeros primos\n", getpid(), total_primes);
-}
-
-void level_three_process(int shmid, int row, int process_id)
-{
-    // Attach the shared memory segment
-    int *matrix = shmat(shmid, NULL, 0);
-    int prime_count = 0;
-    char filename[50];
-
-    if (matrix == (int *)-1)
+    // Escribo en el archivo de salida
+    sprintf(filename, N2_FILENAME, getpid());
+    file = fopen(filename, "a");
+    if (file == NULL)
     {
-        perror("shmat");
+        perror("Error opening file");
         exit(EXIT_FAILURE);
     }
+    else
+    {
+        fprintf(file, "Inicio de ejecucion\n");
+        for (int i = start_row; i <= end_row; i++)
+        {
+            fprintf(file, "He creado el proceso hijo %d para encargarse de la fila %d\n", child_pids[i], i);
+        }
+        fprintf(file, "Resultado total enviado por sus hijos: %d\n", total_primes[child_index]);
+        fclose(file);
+    }
 
-    // Access matrix[row] in level_three_process and count prime numbers
+    // Envio el total de primos al padre a través de la tuberia junto con el pid del proceso
+    write(pipe_fd[1], &child_index, sizeof(child_index));
+    pid = getpid();
+    write(pipe_fd[1], &pid, sizeof(pid));
+    usleep(300);
+
+    // Envio la señal SIGUSR1 (indice del que leer) al padre notificando que ya puede leer de la tuberia
+    kill(getppid(), SIGUSR1);
+
+    // Espero a que el padre lea los primos enviados
+    pause();
+}
+
+// Cada proceso de nivel 3 se encarga de calcular los primos de una fila
+void level_three_process(int row)
+{
+    int prime_count = 0;
+    char filename[50];
+    FILE *file;
+
     for (int j = 0; j < COLS; j++)
     {
-        if (is_prime(matrix[row * COLS + j]))
+        if (is_prime(matrix[row][j]))
         {
             prime_count++;
 
-            // Store the prime number in the file
-            sprintf(filename, "N3_%d.cousins", getpid());
-            FILE *file = fopen(filename, "a");
-            fprintf(file, "level:%d:process_id:%d:cousin_num:%d\n", 3, process_id, matrix[row * COLS + j]);
-            fclose(file);
+            // Escribo en el archivo de salida
+            sprintf(filename, N3_FILENAME, getpid());
+            file = fopen(filename, "a");
+            if (file == NULL)
+            {
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                fprintf(file, "Nivel: %d, ID de proceso:%d, Primos:%d\n", 3, getpid(), matrix[row][j]);
+                fclose(file);
+            }
         }
     }
 
-    // Inform the parent process of the number of primes found
-    printf("Soy el proceso hijo de nivel 3 %d, mi padre es %d y me voy a encargar de la fila %d\n", getpid(), getppid(), row);
-    printf("...\nHe encontrado %d numeros primos\n", prime_count);
+    // Salgo con el número de primos encontrados
     exit(prime_count);
 }
 
@@ -188,4 +319,59 @@ int is_prime(int num)
         }
     }
     return 1;
+}
+
+void sigusr1_signal_handler(int signum)
+{
+    FILE *file;
+    char filename[50];
+    int data;
+    pid_t pid;
+    pid_t child_pid;
+
+    pid = getpid();
+
+    read(pipe_fd[0], &data, sizeof(data));
+    read(pipe_fd[0], &child_pid, sizeof(child_pid));
+
+    sprintf(filename, N1_FILENAME, getpid());
+    file = fopen(filename, "a");
+    if (file == NULL)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        fprintf(file, "He recibido la señal SIGUSR1 %d del proceso hijo %d\n", data, child_pid);
+        fclose(file);
+    }
+
+    if (kill(child_pid, SIGINT) == -1)
+    {
+        perror("Error sending SIGINT signal");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        file = fopen(filename, "a");
+        if (file == NULL)
+        {
+            perror("Error opening file");
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            fprintf(file, "He enviado la señal SIGINT al proceso hijo %d\n", child_pid);
+            fclose(file);
+        }
+    }
+}
+
+void sigint_signal_handler(int signum)
+{
+    pid_t pid = getpid();
+    pid_t ppid = getppid();
+    // printf("Proceso hijo de nivel 2 %d: Mi padre %d ha leido el total de primos que le he enviado. Yo ya he acabado mi tarea\n", pid, ppid);
+    exit(EXIT_SUCCESS);
 }
