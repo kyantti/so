@@ -1,11 +1,14 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 
 #define ROWS 15
 #define COLS 10
@@ -299,7 +302,9 @@ void sigusr1_signal_handler(int signum)
     sprintf(cadena, "echo He recibido la señal SIGUSR1 del proceso hijo %d y se envia SIGINT. >> %s", child_pid, filename);
 
     kill(child_pid, SIGINT);
+
     system(cadena);
+
 }
 
 
