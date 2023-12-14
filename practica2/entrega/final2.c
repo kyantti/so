@@ -33,16 +33,17 @@ int main()
     pid_t child_pids[NUM_CHILDS];
     int start_row;
     int end_row;
-    int *total_primes;
+    int *total_primes = NULL;
     int result;
     key_t key;
     char filename[50];
     FILE *file;
+    int i = 0;
 
     // Si existen, elimino los directorios de salida y sus archivos
     system("rm -rf n1 n2 n3");
     system("mkdir n1 n2 n3");
-    
+
     // Creo el archivo de salida y escribo la primera linea
     sprintf(filename, N1_FILENAME, getpid());
     file = fopen(filename, "a");
@@ -60,7 +61,7 @@ int main()
 
     // Creo la tuberia
     pipe(pipe_fd);
-    
+
     // Armado de señal SIGUSR1 para leer de la tuberia
     sa.sa_handler = sigusr1_signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -68,7 +69,7 @@ int main()
     sigaction(SIGUSR1, &sa, NULL);
 
     // Inicializo la matriz
-    for (int i = 0; i < ROWS; i++)
+    for (i = 0; i < ROWS; i++)
     {
         for (int j = 0; j < COLS; j++)
         {
@@ -77,42 +78,42 @@ int main()
     }
 
     // Inicializo el total de primos de cada hijo a 0
-    for (int i = 0; i < NUM_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
         total_primes[i] = 0;
     }
 
     // Creo 3 procesos de nivel 2
-    for (int i = 0; i < NUM_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
-        start_row = i * ROWS/NUM_CHILDS;
+        start_row = i * ROWS / NUM_CHILDS;
         end_row = start_row + 4;
 
         pid = fork();
-        if (pid < 0)
+        switch (pid)
         {
+        case -1:
             perror("Error creating level 2 child process");
             exit(EXIT_FAILURE);
-        }
-        else if (pid == 0)
-        {
+            break;
+
+        case 0:
             printf("Proceso de nivel 2 antes %d\n", getpid());
             level_two_process(total_primes, start_row, end_row);
             printf("Proceso de nivel 2 despues %d\n", getpid());
-        }
-        else
-        {
-            printf("Valor i %d, valor pid %d\n", i, pid);
+            break;
+
+        default:
             child_pids[i] = pid;
-            printf("Child_pid %d\n", child_pids[i]);
-            file = fopen(filename, "a");
+            FILE *file = fopen(filename, "a");
             fprintf(file, "He creado el proceso hijo %d para encargarse de las filas %d a %d\n", pid, start_row, end_row);
             fclose(file);
+            break;
         }
     }
 
     // Espero a que los hijos de nivel 2 hagan su tarea
-    for (int i = 0; i < NUM_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
         int p = wait(NULL);
         printf("Proceso %d ha acabado su tarea\n", p);
@@ -120,7 +121,7 @@ int main()
 
     // Calculo el total de primos
     result = 0;
-    for (int i = 0; i < NUM_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
         result += total_primes[i];
     }
@@ -144,10 +145,11 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     int child_index;
     struct sigaction sa;
     FILE *file;
-    int pid;
+    pid_t pid; 
     int child_pids[ROWS];
     int child_status = 0;
     char filename[50];
+    int i = 0;
 
     printf("Soy el proceso de nivel 2 %d\n", getpid());
 
@@ -155,13 +157,13 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     sa.sa_handler = sigint_signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGUSR2, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 
     // Calculo el indice del hijo para saber a que posicion del array de primos enviar el resultado
     child_index = start_row / (ROWS / NUM_CHILDS);
 
     // Creo un proceso de nivel 3 para cada fila
-    for (int i = start_row; i <= end_row; i++)
+    for (i = start_row; i <= end_row; i++)
     {
         printf("Indice N3: %d\n", i);
         pid = fork();
@@ -184,14 +186,14 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     }
 
     // Espero a que los hijos de nivel 3 terminen de ejecutarse
-    for (int i = 0; i < 5; i++)
+    for (i = 0; i < 5; i++)
     {
         //  Espero a que el hijo termine de ejecutarse y obtengo su estado
         wait(&child_status);
         // Verifico que el hijo haya terminado exitosamente
         if (WIFEXITED(child_status))
         {
-           total_primes[child_index] += WEXITSTATUS(child_status);
+            total_primes[child_index] += WEXITSTATUS(child_status);
         }
     }
 
@@ -199,7 +201,7 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     sprintf(filename, N2_FILENAME, getpid());
     file = fopen(filename, "a");
     fprintf(file, "Inicio de ejecucion\n");
-    for (int i = start_row; i <= end_row; i++)
+    for (i = start_row; i <= end_row; i++)
     {
         fprintf(file, "He creado el proceso hijo %d para encargarse de la fila %d\n", child_pids[i], i);
     }
@@ -209,8 +211,7 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     // Envio el total de primos al padre a través de la tuberia junto con el pid del proceso
     pid = getpid();
     printf("Enviando el pid %d por la tuberia\n", pid);
-    write(pipe_fd[1], &pid, sizeof(int));
-    
+    write(pipe_fd[1], &pid, sizeof(pid_t));
 
     // Envio la señal SIGUSR1 (indice del que leer) al padre notificando que ya puede leer de la tuberia
     kill(getppid(), SIGUSR1);
@@ -237,7 +238,7 @@ void level_three_process(int row)
         if (is_prime(matrix[row][j]))
         {
             prime_count++;
-            fprintf(file, "Nivel: %d, ID de proceso:%d, Primos:%d\n", 3, getpid(), matrix[row][j]);    
+            fprintf(file, "Nivel: %d, ID de proceso:%d, Primos:%d\n", 3, getpid(), matrix[row][j]);
         }
     }
     fclose(file);
@@ -266,20 +267,19 @@ void sigusr1_signal_handler(int signum)
     char filename[50];
     char cadena[100];
     pid_t pid;
-    int child_pid;
+    pid_t child_pid;
     sprintf(filename, N1_FILENAME, getpid());
     pid = getpid();
 
-    read(pipe_fd[0], &child_pid, sizeof(int));
+    read(pipe_fd[0], &child_pid, sizeof(pid_t));
 
     printf("Leyendo el pid %d por la tuberia\n", child_pid);
-    
-    //printf("Proceso padre %d: He recibido la señal SIGUSR1 del proceso hijo %d y se envia SIGINT.\n", pid, child_pid);
+
+    // printf("Proceso padre %d: He recibido la señal SIGUSR1 del proceso hijo %d y se envia SIGINT.\n", pid, child_pid);
     sprintf(cadena, "echo He recibido la señal SIGUSR1 del proceso hijo %d y se envia SIGINT. >> %s", child_pid, filename);
     system(cadena);
 
-    kill(child_pid, SIGUSR2);
-
+    kill(child_pid, SIGINT);
 }
 
 void sigint_signal_handler(int signum)
