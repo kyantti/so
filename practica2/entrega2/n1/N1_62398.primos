@@ -1,0 +1,8 @@
+Inicio de ejecucion
+He creado el proceso hijo 62401 para encargarse de las filas 0 a 4
+He creado el proceso hijo 62403 para encargarse de las filas 5 a 9
+He creado el proceso hijo 62405 para encargarse de las filas 10 a 14
+He recibido la señal SIGUSR1 del proceso hijo 62401 y se envia SIGINT.
+He recibido la señal SIGUSR1 del proceso hijo 62403 y se envia SIGINT.
+Resultado total: 1632
+He recibido la señal SIGUSR1 del proceso hijo 62405 y se envia SIGINT.

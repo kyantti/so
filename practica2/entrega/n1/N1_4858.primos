@@ -1,0 +1,6 @@
+Inicio de ejecucion
+He creado el proceso hijo 4861 para encargarse de las filas 0 a 4
+He creado el proceso hijo 4862 para encargarse de las filas 5 a 9
+He creado el proceso hijo 4866 para encargarse de las filas 10 a 14
+He recibido la señal SIGUSR1 del proceso hijo 12 y se envia SIGINT.
+He recibido la señal SIGUSR1 del proceso hijo 13 y se envia SIGINT.

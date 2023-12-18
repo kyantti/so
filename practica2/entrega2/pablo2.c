@@ -12,7 +12,7 @@
 
 #define ROWS 15
 #define COLS 1000
-#define NUM_N2_CHILDS 3
+#define NUM_CHILDS 3
 #define N1_FILENAME "n1/N1_%d.primos"
 #define N2_FILENAME "n2/N2_%d.primos"
 #define N3_FILENAME "n3/N3_%d.primos"
@@ -36,7 +36,7 @@ int main()
     int start_row;
     int end_row;
     pid_t pid;
-    pid_t child_pids[NUM_N2_CHILDS];
+    pid_t child_pids[NUM_CHILDS];
     int result;
     int i;
     
@@ -80,15 +80,15 @@ int main()
     }
 
     // Inicializo el total de primos de cada hijo a 0
-    for (i = 0; i < NUM_N2_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
         total_primes[i] = 0;
     }
 
     // Creo 3 procesos de nivel 2
-    for (i = 0; i < NUM_N2_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
-        start_row = i * ROWS / NUM_N2_CHILDS;
+        start_row = i * ROWS / NUM_CHILDS;
         end_row = start_row + 4;
 
         pid = fork();
@@ -103,7 +103,7 @@ int main()
             sa.sa_handler = sigint_signal_handler;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = 0;
-            sigaction(SIGINT, &sa, NULL);
+            sigaction(SIGUSR2, &sa, NULL);
 
             level_two_process(total_primes, start_row, end_row);
             sleep(1);
@@ -125,7 +125,7 @@ int main()
 
     // Calculo el total de primos
     result = 0;
-    for (i = 0; i < NUM_N2_CHILDS; i++)
+    for (i = 0; i < NUM_CHILDS; i++)
     {
         result += total_primes[i];
     }
@@ -157,7 +157,7 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     int N2 = getpid();
 
     // Calculo el indice del hijo para saber a que posicion del array de primos enviar el resultado
-    child_index = start_row / (ROWS / NUM_N2_CHILDS);
+    child_index = start_row / (ROWS / NUM_CHILDS);
 
     // Creo un proceso de nivel 3 para cada fila
     for (i = start_row; i <= end_row; i++)
@@ -218,7 +218,7 @@ void level_two_process(int *total_primes, int start_row, int end_row)
     fprintf(file, "Resultado total enviado por sus hijos: %d\n", total_primes[child_index]);
     fclose(file);
 
-    // Envio una comunicación por tuberia al padre con el pid del hijo para avisarle que se ha actualizado la memoria compartida
+    // Envio el total de primos al padre a través de la tuberia junto con el pid del proceso
     write(pipe_fd[1], &N2, sizeof(int));
     usleep(100);
 
@@ -259,9 +259,8 @@ void sigusr1_signal_handler(int signum)
     file = fopen(filename, "a");
     fprintf(file, "He recibido la señal SIGUSR1 del proceso hijo %d y se envia SIGINT.\n", child_pid);
     fclose(file);
-    kill(child_pid, SIGINT);
+    kill(child_pid, SIGUSR2);
     usleep(100);  
-
 }
 
 void sigint_signal_handler(int signum)

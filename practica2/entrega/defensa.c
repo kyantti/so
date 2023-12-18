@@ -25,6 +25,7 @@ void level_two_process(int *total_primes, int start_row, int end_row);
 int is_prime(int num);
 void sigusr1_signal_handler(int signum);
 void sigint_signal_handler(int signum);
+void sigusr2_signal_handler(int signum);
 
 int main()
 {
@@ -105,6 +106,11 @@ int main()
             sa.sa_flags = 0;
             sigaction(SIGINT, &sa, NULL);
 
+            sa.sa_handler = sigusr2_signal_handler;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sigaction(SIGUSR2, &sa, NULL);
+
             level_two_process(total_primes, start_row, end_row);
             sleep(1);
             exit(0);
@@ -170,6 +176,10 @@ void level_two_process(int *total_primes, int start_row, int end_row)
         }
         else if (pid == 0)
         {
+            write(pipe_fd[1], &i, sizeof(int));
+            usleep(100);
+            kill(getppid(), SIGUSR2);
+
             int prime_count = 0;
             char filename1[50];
             FILE *file1;
@@ -269,3 +279,12 @@ void sigint_signal_handler(int signum)
     usleep(100);
     exit(EXIT_SUCCESS);
 }
+
+void sigusr2_signal_handler(int signum)
+{
+    int i;
+    read(pipe_fd[0], &i, sizeof(int));
+    printf("Soy el proceso de nivel 2: %d y mi quinto hijo: %d ya esta trabajando\n", getpid(), i);
+    usleep(100);  
+}
+
